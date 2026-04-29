@@ -29,7 +29,7 @@ use the `@montage/sdk/react` entry point.
 
 ## Quick start
 
-Get an API key from https://montage.dev, then:
+Get an API key from https://console.usemontage.ai, then:
 
 ```ts
 import Anthropic from "@anthropic-ai/sdk";
