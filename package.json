@@ -1,0 +1,99 @@
+{
+  "name": "@montage/sdk",
+  "version": "0.3.0",
+  "description": "Montage SDK — call the Montage API from any JS/TS app and render generated HTML artifacts. Give any LLM the ability to generate production-ready UI artifacts — dashboards, charts, reports, forms, and full interactive applications — instead of returning plain text.",
+  "license": "MIT",
+  "homepage": "https://usemontage.ai",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/usemontage/sdk.git"
+  },
+  "keywords": [
+    "montage",
+    "ai",
+    "llm",
+    "ui",
+    "html",
+    "agent",
+    "anthropic",
+    "openai",
+    "mastra",
+    "langchain",
+    "vercel-ai-sdk",
+    "mcp",
+    "tool-use",
+    "artifact",
+    "dashboard",
+    "charts"
+  ],
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./tools": {
+      "import": "./dist/tools.js",
+      "types": "./dist/tools.d.ts"
+    },
+    "./integrations": {
+      "import": "./dist/integrations.js",
+      "types": "./dist/integrations.d.ts"
+    },
+    "./agent-adapter": {
+      "import": "./dist/agent-adapter.js",
+      "types": "./dist/agent-adapter.d.ts"
+    },
+    "./capability-bridge": {
+      "import": "./dist/capability-bridge.js",
+      "types": "./dist/capability-bridge.d.ts"
+    },
+    "./std-capabilities": {
+      "import": "./dist/std-capabilities.js",
+      "types": "./dist/std-capabilities.d.ts"
+    },
+    "./html": {
+      "import": "./dist/html/mount-html-block.js",
+      "types": "./dist/html/mount-html-block.d.ts"
+    },
+    "./react": {
+      "import": "./dist/react/index.js",
+      "types": "./dist/react/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "clean": "rm -rf dist"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0 || ^19.0.0",
+    "react-dom": "^18.0.0 || ^19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "@types/react": "^19.0.7",
+    "@types/react-dom": "^19.0.3",
+    "jsdom": "^25.0.0",
+    "tsup": "^8.3.6",
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.8"
+  }
+}
