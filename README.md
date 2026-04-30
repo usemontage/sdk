@@ -112,21 +112,51 @@ conflict.
 
 ```ts
 import { z } from "zod";
-import { integrations, createMontageTools } from "@montage/sdk";
+import { createMontageTools, integrations } from "@montage/sdk";
+import { createMontageAiSdkTool } from "@montage/sdk/ai-sdk";
+import { createMontageMastraTool } from "@montage/sdk/mastra";
 
 const toolkit = createMontageTools({ apiKey: process.env.MONTAGE_API_KEY! });
 
 // Mastra: { id, description, inputSchema, execute }
 const mastraTool = integrations.mastra(toolkit, z);
+const directMastraTool = createMontageMastraTool(toolkit, z);
 
 // LangChain: { name, description, schema, func }
 const langchainTool = integrations.langchain(toolkit, z);
 
-// Vercel AI SDK: { description, parameters, execute }
+// Vercel AI SDK: { description, inputSchema, parameters, execute }
 const aiTool = integrations.vercelAi(toolkit, z);
+const directAiTool = createMontageAiSdkTool(toolkit, z);
 
 // Generic JSON-schema definition
 const rawTool = integrations.raw(toolkit);
+```
+
+For Vercel AI SDK, pass the direct adapter into `tool(...)`:
+
+```ts
+import { tool } from "ai";
+import { z } from "zod";
+import { createMontageTools } from "@montage/sdk";
+import { createMontageAiSdkTool } from "@montage/sdk/ai-sdk";
+
+const toolkit = createMontageTools({ apiKey: process.env.MONTAGE_API_KEY! });
+
+export const tools = {
+  montage_generate: tool(createMontageAiSdkTool(toolkit, z)),
+};
+```
+
+For Mastra, register the direct adapter with your agent's tool set:
+
+```ts
+import { z } from "zod";
+import { createMontageTools } from "@montage/sdk";
+import { createMontageMastraTool } from "@montage/sdk/mastra";
+
+const toolkit = createMontageTools({ apiKey: process.env.MONTAGE_API_KEY! });
+const montageGenerate = createMontageMastraTool(toolkit, z);
 ```
 
 ## Rendering generated HTML in React

@@ -11,6 +11,12 @@ export { MontageError } from "./errors";
 export { createMontageAdapter } from "./agent-adapter";
 export { bindMontageCapabilityBridge } from "./capability-bridge";
 export { mountHtmlBlock } from "./html/mount-html-block";
+export {
+  createMontageAiSdkTool,
+  createMontageVercelAiTool,
+  montageAiSdkTool,
+} from "./ai-sdk";
+export { createMontageMastraTool, montageMastraTool } from "./mastra";
 
 export type {
   MontageCapabilityAvailability,
@@ -40,3 +46,5 @@ export type {
   MontageCapabilityBridgeOptions,
 } from "./capability-bridge";
 export type { MountedHtmlBlockOptions } from "./html/mount-html-block";
+export type { MontageAiSdkToolConfig } from "./ai-sdk";
+export type { MontageMastraTool } from "./mastra";

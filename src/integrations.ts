@@ -20,7 +20,7 @@ import type {
  * used by the adapters.  The real `z` from `"zod"` is a superset of this,
  * so the user's instance satisfies it without version conflicts.
  */
-interface ZodLike {
+export interface ZodLike {
   object: Function;
   string: Function;
   enum: Function;
@@ -59,6 +59,30 @@ function buildZodSchema(z: ZodLike): unknown {
   });
 }
 
+type ToolExecuteInput =
+  | MontageGenerateInput
+  | { context?: MontageGenerateInput; input?: MontageGenerateInput };
+
+function normalizeToolExecuteInput(input: ToolExecuteInput): MontageGenerateInput {
+  if (
+    input
+    && typeof input === "object"
+    && "context" in input
+    && input.context
+  ) {
+    return input.context;
+  }
+  if (
+    input
+    && typeof input === "object"
+    && "input" in input
+    && input.input
+  ) {
+    return input.input;
+  }
+  return input as MontageGenerateInput;
+}
+
 const JSON_SCHEMA = {
   type: "object" as const,
   required: ["prompt", "dataInfo"],
@@ -92,8 +116,8 @@ export function mastra(toolkit: MontageToolkit, z: ZodLike) {
     id: TOOL_NAME,
     description: TOOL_DESCRIPTION,
     inputSchema: buildZodSchema(z),
-    execute: async (input: MontageGenerateInput): Promise<MontageGenerateResult> =>
-      toolkit.execute(input),
+    execute: async (input: ToolExecuteInput): Promise<MontageGenerateResult> =>
+      toolkit.execute(normalizeToolExecuteInput(input)),
   };
 }
 
@@ -116,11 +140,15 @@ export function langchain(toolkit: MontageToolkit, z: ZodLike) {
 // tool() from "ai" accepts: { description, parameters: zodSchema, execute }
 
 export function vercelAi(toolkit: MontageToolkit, z: ZodLike) {
+  const schema = buildZodSchema(z);
   return {
     description: TOOL_DESCRIPTION,
-    parameters: buildZodSchema(z),
-    execute: async (input: MontageGenerateInput): Promise<MontageGenerateResult> =>
-      toolkit.execute(input),
+    // AI SDK v5 uses `inputSchema`; older Vercel AI SDK versions use `parameters`.
+    // Keep both so the adapter remains source-compatible across supported agents.
+    inputSchema: schema,
+    parameters: schema,
+    execute: async (input: ToolExecuteInput): Promise<MontageGenerateResult> =>
+      toolkit.execute(normalizeToolExecuteInput(input)),
   };
 }
 

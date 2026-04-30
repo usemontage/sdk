@@ -38,6 +38,8 @@ describe("package public surface", () => {
 
     const exportsField = packageJson.exports as Record<string, unknown>;
     expect(Object.keys(exportsField)).not.toContain(`./${standardNamespace}-capabilities`);
+    expect(Object.keys(exportsField)).toContain("./mastra");
+    expect(Object.keys(exportsField)).toContain("./ai-sdk");
 
     const exportTargets = Object.values(exportsField).flatMap((entry) =>
       collectExportTargets(entry),

@@ -42,6 +42,14 @@
       "types": "./dist/tools.d.ts",
       "import": "./dist/tools.js"
     },
+    "./mastra": {
+      "types": "./dist/mastra.d.ts",
+      "import": "./dist/mastra.js"
+    },
+    "./ai-sdk": {
+      "types": "./dist/ai-sdk.d.ts",
+      "import": "./dist/ai-sdk.js"
+    },
     "./integrations": {
       "types": "./dist/integrations.d.ts",
       "import": "./dist/integrations.js"
@@ -61,8 +69,8 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsup src/index.ts src/agent-adapter.ts src/capability-bridge.ts src/tools.ts src/integrations.ts src/html/mount-html-block.ts src/react/index.ts --format esm --dts --clean --external react --external react-dom",
-    "dev": "tsup src/index.ts src/agent-adapter.ts src/capability-bridge.ts src/tools.ts src/integrations.ts src/html/mount-html-block.ts src/react/index.ts --format esm --dts --watch --external react --external react-dom",
+    "build": "tsup src/index.ts src/agent-adapter.ts src/capability-bridge.ts src/tools.ts src/integrations.ts src/mastra.ts src/ai-sdk.ts src/html/mount-html-block.ts src/react/index.ts --format esm --dts --clean --external react --external react-dom",
+    "dev": "tsup src/index.ts src/agent-adapter.ts src/capability-bridge.ts src/tools.ts src/integrations.ts src/mastra.ts src/ai-sdk.ts src/html/mount-html-block.ts src/react/index.ts --format esm --dts --watch --external react --external react-dom",
     "prepack": "pnpm run build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --config /dev/null",
