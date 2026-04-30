@@ -19,8 +19,6 @@ export type SubmissionValue =
 
 export type MontageGenerateOutputQuality = "default" | "high" | "xhigh";
 
-export type MontageBackendType = "fluxAOT" | "fluxUI";
-
 export interface MontageRenderSurface {
   width?: number;
   height?: number;
@@ -31,7 +29,7 @@ export interface MontageRenderSurface {
 
 export type MontageCapabilityEffect = "pure" | "query" | "effect";
 
-export type MontageCapabilityAvailability = "runtime" | "adapter" | "declared";
+export type MontageCapabilityAvailability = "adapter" | "declared";
 
 export interface MontageCapabilitySpec {
   name: string;
@@ -40,6 +38,10 @@ export interface MontageCapabilitySpec {
   description: string;
   inputSchema?: Record<string, unknown>;
   outputSchema?: Record<string, unknown>;
+  /**
+   * Defaults to "adapter". Use "declared" when an artifact may request the
+   * capability but the current host has not installed an implementation.
+   */
   availability?: MontageCapabilityAvailability;
 }
 
@@ -95,7 +97,6 @@ export interface MontageAdapterGenerateRequest {
    * structurally compatible with config inputs.
    */
   designSystem?: MontageDesignSystem | MontageDesignSystemConfig;
-  backendType?: MontageBackendType;
   renderSurface?: MontageRenderSurface;
 }
 

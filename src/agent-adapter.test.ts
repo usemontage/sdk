@@ -88,7 +88,7 @@ describe("createMontageAdapter runtime contract", () => {
     });
   });
 
-  it("allows adapter tools to request the shared FluxUI backend and render surface", async () => {
+  it("allows adapter tools to request a render surface", async () => {
     const adapter = createMontageAdapter({
       agent: companyAgent,
       tools: [
@@ -102,7 +102,6 @@ describe("createMontageAdapter runtime contract", () => {
           prompt: "Build a project command center.",
           dataInfo: "Projects, risks, milestones, and capacity.",
           outputQuality: "xhigh",
-          backendType: "fluxUI",
           renderSurface: {
             width: 760,
             height: 720,
@@ -119,7 +118,6 @@ describe("createMontageAdapter runtime contract", () => {
       prompt: "Build a project command center.",
       dataInfo: "Projects, risks, milestones, and capacity.",
       outputQuality: "default",
-      backendType: "fluxUI",
       renderSurface: {
         width: 760,
         height: 720,
@@ -182,7 +180,7 @@ describe("createMontageAdapter runtime contract", () => {
     } satisfies Partial<MontageError>);
   });
 
-  it("rejects invalid adapter backend and render-surface fields", async () => {
+  it("rejects invalid adapter render-surface fields", async () => {
     const adapter = createMontageAdapter({
       agent: companyAgent,
       tools: [
@@ -196,7 +194,6 @@ describe("createMontageAdapter runtime contract", () => {
           prompt: "Build a project command center.",
           dataInfo: "Projects, risks, milestones, and capacity.",
           outputQuality: "high",
-          backendType: "react-app",
           renderSurface: { width: -1 },
         } as never;
       },
@@ -214,7 +211,7 @@ describe("createMontageAdapter runtime contract", () => {
       agent: companyAgent,
       capabilities: [
         {
-          name: "std.artifact.pdf",
+          name: "artifact.pdf.render",
           effect: "effect",
           description: "Render a PDF artifact through the host.",
           availability: "adapter",
@@ -222,8 +219,8 @@ describe("createMontageAdapter runtime contract", () => {
       ],
       async invokeCapability(request) {
         expect(request).toMatchObject({
-          name: "std.artifact.pdf",
-          source: "std.artifact.pdf",
+          name: "artifact.pdf.render",
+          source: "artifact.pdf.render",
           effect: "effect",
           args: [{ title: "Lead brief" }],
         });
@@ -238,8 +235,8 @@ describe("createMontageAdapter runtime contract", () => {
 
     expect(adapter.listCapabilities()).toEqual([
       expect.objectContaining({
-        name: "std.artifact.pdf",
-        source: "std.artifact.pdf",
+        name: "artifact.pdf.render",
+        source: "artifact.pdf.render",
         effect: "effect",
       }),
     ]);
@@ -247,8 +244,8 @@ describe("createMontageAdapter runtime contract", () => {
 
     await expect(
       adapter.invokeCapability({
-        name: "std.artifact.pdf",
-        source: "std.artifact.pdf",
+        name: "artifact.pdf.render",
+        source: "artifact.pdf.render",
         effect: "effect",
         args: [{ title: "Lead brief" }],
       }),
@@ -258,41 +255,12 @@ describe("createMontageAdapter runtime contract", () => {
     });
   });
 
-  it("invokes enabled runtime standard capabilities directly from the adapter", async () => {
-    const adapter = createMontageAdapter({
-      agent: companyAgent,
-      std: { enabled: true },
-    });
-
-    expect(adapter.listCapabilities()).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          name: "std.data.filter",
-          effect: "pure",
-          availability: "runtime",
-        }),
-      ]),
-    );
-
-    await expect(
-      Promise.resolve().then(() => adapter.invokeCapability({
-        name: "std.data.filter",
-        source: "std.data.filter",
-        effect: "pure",
-        args: [
-          [{ company: "Acme" }, { company: "Globex" }],
-          { search: "glo", fields: ["company"] },
-        ],
-      })),
-    ).resolves.toEqual([{ company: "Globex" }]);
-  });
-
   it("validates capability input and output schemas when provided", async () => {
     const adapter = createMontageAdapter({
       agent: companyAgent,
       capabilities: [
         {
-          name: "std.artifact.pdf",
+          name: "artifact.pdf.render",
           effect: "effect",
           description: "Render a PDF artifact through the host.",
           availability: "adapter",
@@ -323,8 +291,8 @@ describe("createMontageAdapter runtime contract", () => {
 
     await expect(
       Promise.resolve().then(() => adapter.invokeCapability({
-        name: "std.artifact.pdf",
-        source: "std.artifact.pdf",
+        name: "artifact.pdf.render",
+        source: "artifact.pdf.render",
         effect: "effect",
         args: [{ title: "Lead brief" }],
       })),
@@ -332,8 +300,8 @@ describe("createMontageAdapter runtime contract", () => {
 
     await expect(
       Promise.resolve().then(() => adapter.invokeCapability({
-        name: "std.artifact.pdf",
-        source: "std.artifact.pdf",
+        name: "artifact.pdf.render",
+        source: "artifact.pdf.render",
         effect: "effect",
         args: [{ title: 42 }],
       })),
@@ -347,7 +315,7 @@ describe("createMontageAdapter runtime contract", () => {
       agent: companyAgent,
       capabilities: [
         {
-          name: "std.artifact.pdf",
+          name: "artifact.pdf.render",
           effect: "effect",
           description: "Render a PDF artifact through the host.",
           availability: "adapter",
@@ -367,8 +335,8 @@ describe("createMontageAdapter runtime contract", () => {
 
     await expect(
       Promise.resolve().then(() => adapter.invokeCapability({
-        name: "std.artifact.pdf",
-        source: "std.artifact.pdf",
+        name: "artifact.pdf.render",
+        source: "artifact.pdf.render",
         effect: "effect",
         args: [{ title: "Lead brief" }],
       })),
@@ -382,7 +350,7 @@ describe("createMontageAdapter runtime contract", () => {
       agent: companyAgent,
       capabilities: [
         {
-          name: "std.collection.query",
+          name: "collection.query",
           effect: "query",
           description: "Query a local collection.",
         },
@@ -394,8 +362,8 @@ describe("createMontageAdapter runtime contract", () => {
 
     await expect(
       Promise.resolve().then(() => adapter.invokeCapability({
-        name: "std.collection.query",
-        source: "std.collection.query",
+        name: "collection.query",
+        source: "collection.query",
         effect: "effect",
         args: [],
       })),
@@ -405,8 +373,8 @@ describe("createMontageAdapter runtime contract", () => {
 
     await expect(
       Promise.resolve().then(() => adapter.invokeCapability({
-        name: "std.missing",
-        source: "std.missing",
+        name: "collection.missing",
+        source: "collection.missing",
         effect: "query",
         args: [],
       })),

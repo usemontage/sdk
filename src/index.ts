@@ -11,15 +11,8 @@ export { MontageError } from "./errors";
 export { createMontageAdapter } from "./agent-adapter";
 export { bindMontageCapabilityBridge } from "./capability-bridge";
 export { mountHtmlBlock } from "./html/mount-html-block";
-export {
-  STD_CAPABILITY_INDEX,
-  STD_CAPABILITY_SPECS,
-  getStdCapabilityEffect,
-  isStdCapabilityRuntimeAvailable,
-} from "./std-capabilities";
 
 export type {
-  MontageBackendType,
   MontageCapabilityAvailability,
   MontageCapabilityEffect,
   MontageCapabilityInvokeRequest,

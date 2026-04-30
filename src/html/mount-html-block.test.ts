@@ -9,6 +9,14 @@ const agent = {
   name: "SDK Agent",
 };
 
+type TestGlobal = typeof globalThis & {
+  MontageAOT?: unknown;
+};
+
+type TestWindow = Window & typeof globalThis & {
+  MontageAOT?: unknown;
+};
+
 async function tick(): Promise<void> {
   await Promise.resolve();
   await new Promise((resolve) => setTimeout(resolve, 0));
@@ -95,8 +103,8 @@ describe("mountHtmlBlock", () => {
     expect(host.querySelector("#capability-result")?.textContent).toBe("Board packet");
 
     cleanup();
-    expect(globalThis.MontageAOT).toBeUndefined();
-    expect(window.MontageAOT).toBeUndefined();
+    expect((globalThis as TestGlobal).MontageAOT).toBeUndefined();
+    expect((window as TestWindow).MontageAOT).toBeUndefined();
     host.remove();
   });
 });

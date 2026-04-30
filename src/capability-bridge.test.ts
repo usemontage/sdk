@@ -5,18 +5,37 @@ import { createMontageAdapter } from "./agent-adapter";
 import { bindMontageCapabilityBridge } from "./capability-bridge";
 import type { ArtifactRef } from "./types";
 
+type TestArtifactHost = {
+  invoke(request: {
+    name: string;
+    source: string;
+    effect: "pure" | "query" | "effect";
+    args: unknown[];
+  }): unknown;
+};
+
+type TestGlobal = typeof globalThis & {
+  MontageAOT?: TestArtifactHost;
+};
+
 const companyAgent = {
   id: "agent-x",
   name: "Agent X",
 };
 
+function getHost(): TestArtifactHost {
+  const host = (globalThis as TestGlobal).MontageAOT;
+  if (!host) throw new Error("Expected artifact host to be installed.");
+  return host;
+}
+
 describe("bindMontageCapabilityBridge", () => {
-  it("resolves built-in std capabilities and adapter overrides through MontageAOT.invoke", async () => {
+  it("resolves adapter capabilities through MontageAOT.invoke", async () => {
     const adapter = createMontageAdapter({
       agent: companyAgent,
       capabilities: [
         {
-          name: "std.artifact.pdf",
+          name: "artifact.pdf.render",
           effect: "effect",
           description: "Host-backed PDF rendering.",
           availability: "adapter",
@@ -33,25 +52,11 @@ describe("bindMontageCapabilityBridge", () => {
     });
 
     const cleanup = bindMontageCapabilityBridge({ root: document, adapter });
-    const host = globalThis.MontageAOT as {
-      invoke(request: {
-        name: string;
-        source: string;
-        effect: "pure" | "query" | "effect";
-        args: unknown[];
-      }): unknown;
-    };
-
-    expect(host.invoke({
-      name: "std.data.filter",
-      source: "std.data.filter",
-      effect: "pure",
-      args: [[{ name: "Acme" }, { name: "Globex" }], { search: "glo", fields: ["name"] }],
-    })).toEqual([{ name: "Globex" }]);
+    const host = getHost();
 
     const pdf = await host.invoke({
-      name: "std.artifact.pdf",
-      source: "std.artifact.pdf",
+      name: "artifact.pdf.render",
+      source: "artifact.pdf.render",
       effect: "effect",
       args: [{ title: "Lead" }],
     });
@@ -62,18 +67,11 @@ describe("bindMontageCapabilityBridge", () => {
 
   it("preserves an existing host MontageAOT.invoke as a fallback", async () => {
     const fallback = vi.fn(() => "fallback-result");
-    globalThis.MontageAOT = { invoke: fallback };
+    (globalThis as TestGlobal).MontageAOT = { invoke: fallback };
     const adapter = createMontageAdapter({ agent: companyAgent });
 
     const cleanup = bindMontageCapabilityBridge({ root: document, adapter });
-    const host = globalThis.MontageAOT as {
-      invoke(request: {
-        name: string;
-        source: string;
-        effect: "pure" | "query" | "effect";
-        args: unknown[];
-      }): unknown;
-    };
+    const host = getHost();
     const result = host.invoke({
       name: "custom.unknown",
       source: "custom.unknown",
@@ -104,14 +102,7 @@ describe("bindMontageCapabilityBridge", () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
 
     const cleanup = bindMontageCapabilityBridge({ root: document, adapter });
-    const host = globalThis.MontageAOT as {
-      invoke(request: {
-        name: string;
-        source: string;
-        effect: "pure" | "query" | "effect";
-        args: unknown[];
-      }): unknown;
-    };
+    const host = getHost();
     expect(() => host.invoke({
       name: "adapter.ui.money",
       source: "adapter.ui.money",
@@ -125,20 +116,23 @@ describe("bindMontageCapabilityBridge", () => {
   it("surfaces capability errors through diagnostics instead of silent no-ops", async () => {
     const onError = vi.fn();
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    const adapter = createMontageAdapter({ agent: companyAgent });
+    const adapter = createMontageAdapter({
+      agent: companyAgent,
+      capabilities: [
+        {
+          name: "artifact.pdf.render",
+          effect: "effect",
+          description: "PDF rendering declared by the artifact.",
+          availability: "declared",
+        },
+      ],
+    });
 
     const cleanup = bindMontageCapabilityBridge({ root: document, adapter, onError });
-    const host = globalThis.MontageAOT as {
-      invoke(request: {
-        name: string;
-        source: string;
-        effect: "pure" | "query" | "effect";
-        args: unknown[];
-      }): unknown;
-    };
+    const host = getHost();
     expect(() => host.invoke({
-      name: "std.artifact.pdf",
-      source: "std.artifact.pdf",
+      name: "artifact.pdf.render",
+      source: "artifact.pdf.render",
       effect: "effect",
       args: [],
     })).toThrow("requires an adapter implementation");
@@ -146,11 +140,11 @@ describe("bindMontageCapabilityBridge", () => {
 
     expect(onError).toHaveBeenCalledWith(
       expect.objectContaining({ code: "capability.unavailable" }),
-      expect.objectContaining({ request: expect.objectContaining({ name: "std.artifact.pdf" }) }),
+      expect.objectContaining({ request: expect.objectContaining({ name: "artifact.pdf.render" }) }),
     );
     expect(consoleError).toHaveBeenCalledWith(expect.objectContaining({ code: "capability.unavailable" }));
     expect(document.querySelector("[data-montage-capability-error]")?.textContent)
-      .toContain("std.artifact.pdf");
+      .toContain("artifact.pdf.render");
     consoleError.mockRestore();
   });
 });

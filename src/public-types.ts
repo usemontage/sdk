@@ -195,7 +195,7 @@ function validateConfig(input: unknown): MontageDesignSystemConfig {
 
 /**
  * Normalizes a partial design-system config into a full
- * `MontageDesignSystem`. Mirrors the implementation in `@montage/schema` but
+ * `MontageDesignSystem`. Mirrors the server-side normalization contract but
  * uses native validation instead of Zod so the SDK has no schema dep.
  */
 export function normalizeMontageDesignSystem(

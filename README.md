@@ -29,7 +29,12 @@ use the `@montage/sdk/react` entry point.
 
 ## Quick start
 
-Get an API key from https://console.usemontage.ai, then:
+Get an API key from https://montage.dev, then:
+
+> `createMontageTools()` sends your API key as a Bearer token and should run in
+> trusted server-side code: API routes, workers, server actions, or agent
+> runtimes. Browser apps should call your server and render the returned HTML
+> with `<HtmlBlock>`.
 
 ```ts
 import Anthropic from "@anthropic-ai/sdk";
@@ -58,11 +63,11 @@ for (const block of response.content) {
 `montage.execute({ prompt, dataInfo, outputQuality?, designSystem? })` returns
 `{ id, html, creditsUsed }`.
 
-Use `prompt` as a product-level render brief, not FluxUI or a low-level layout
-blueprint. A good brief names the goal, audience, workflow, entities, required
-interactions, starting state, constraints, and anti-goals. For import/upload
-workflows, say the artifact needs a real file picker and include expected file
-types and fields in `dataInfo`.
+Use `prompt` as a product-level render brief, not an internal source format or
+low-level layout blueprint. A good brief names the goal, audience, workflow,
+entities, required interactions, starting state, constraints, and anti-goals.
+For import/upload workflows, say the artifact needs a real file picker and
+include expected file types and fields in `dataInfo`.
 
 ## Design systems
 
@@ -168,8 +173,10 @@ const adapter = createMontageAdapter({
 
 ## Capability adapter
 
-Artifacts call host capabilities through `globalThis.MontageAOT.invoke(...)`.
-The SDK's only runtime hook is installing that capability bridge:
+Artifacts call host capabilities through the generated artifact bridge. The
+SDK's only runtime hook is installing that bridge. Built-in artifact runtime
+behavior is owned by generated artifacts and the Montage API; the SDK only
+routes capabilities you explicitly register on the adapter.
 
 ```ts
 import {
@@ -187,7 +194,6 @@ const adapter = createMontageAdapter({
       availability: "adapter",
     },
   ],
-  std: { enabled: true },
   async invokeCapability(request) {
     if (request.name === "fetchEmails") {
       return fetchEmails(request.args?.[0]);

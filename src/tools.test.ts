@@ -35,7 +35,6 @@ describe("createMontageTools", () => {
       defaults: {
         outputQuality: "high",
         designSystem: { theme: "dark", colors: { primary: "#ff0000" } },
-        backendType: "fluxUI",
         renderSurface: { width: 1920, height: 1080 },
       },
     });
@@ -352,23 +351,6 @@ describe("createMontageTools", () => {
         background: "#000000",
         text: "#ffffff",
       });
-    });
-
-    it("includes config.defaults.backendType in the request body", async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ id: "gen_1", html: "<p/>", creditsUsed: 1 }),
-      });
-
-      const tools = createMontageTools({
-        apiKey: "sk_test",
-        defaults: { backendType: "fluxUI" },
-      });
-      await tools.execute({ prompt: "prompt", dataInfo: "{}" });
-
-      const [, opts] = mockFetch.mock.calls[0];
-      const body = JSON.parse(opts.body);
-      expect(body.backendType).toBe("fluxUI");
     });
 
     it("includes config.defaults.renderSurface in the request body", async () => {

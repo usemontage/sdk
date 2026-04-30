@@ -3,23 +3,31 @@ import type {
   MontageAdapter,
   MontageAgentDescriptor,
 } from "./agent-adapter";
-import {
-  STD_CAPABILITY_INDEX,
-  createStandardRuntimeState,
-  invokeStdCapability,
-  isStdCapabilityRuntimeAvailable,
-} from "./std-capabilities";
-import type {
-  MontageCapabilityEffect,
-  MontageCapabilityInvokeRequest,
-} from "./types";
+import type { MontageCapabilityInvokeRequest } from "./types";
 
-declare global {
-  // eslint-disable-next-line no-var
-  var MontageAOT: {
-    invoke?: (request: MontageCapabilityInvokeRequest) => unknown;
-    [key: string]: unknown;
-  } | undefined;
+interface MontageArtifactHost {
+  invoke?: (request: MontageCapabilityInvokeRequest) => unknown;
+  [key: string]: unknown;
+}
+
+type GlobalWithMontageArtifactHost = typeof globalThis & {
+  MontageAOT?: MontageArtifactHost;
+};
+
+function getArtifactHost(): MontageArtifactHost | undefined {
+  return (globalThis as GlobalWithMontageArtifactHost).MontageAOT;
+}
+
+function setArtifactHost(host: MontageArtifactHost): void {
+  (globalThis as GlobalWithMontageArtifactHost).MontageAOT = host;
+}
+
+function restoreArtifactHost(previousHost: MontageArtifactHost | undefined): void {
+  if (previousHost) {
+    setArtifactHost(previousHost);
+  } else {
+    delete (globalThis as GlobalWithMontageArtifactHost).MontageAOT;
+  }
 }
 
 export interface MontageCapabilityBridgeErrorContext {
@@ -126,9 +134,8 @@ export function bindMontageCapabilityBridge<TAgent extends MontageAgentDescripto
   options: MontageCapabilityBridgeOptions<TAgent>,
 ): () => void {
   const { adapter, root, context, onError } = options;
-  const previousHost = globalThis.MontageAOT;
+  const previousHost = getArtifactHost();
   const previousInvoke = previousHost?.invoke;
-  const state = createStandardRuntimeState();
 
   const handleError = (error: unknown, request: MontageCapabilityInvokeRequest): never => {
     const montageError = toMontageError(error);
@@ -145,7 +152,13 @@ export function bindMontageCapabilityBridge<TAgent extends MontageAgentDescripto
       assertRequestShape(rawRequest);
       const request = normalizeRequest(rawRequest, context);
       const adapterCapability = findAdapterCapability(adapter, request);
-      if (adapterCapability && adapterCapability.availability === "adapter") {
+      if (adapterCapability) {
+        if (adapterCapability.availability === "declared") {
+          throw capabilityError(
+            "capability.unavailable",
+            `Capability "${request.name}" requires an adapter implementation.`,
+          );
+        }
         if (adapterCapability.effect !== request.effect) {
           throw capabilityError(
             "capability.effect-mismatch",
@@ -162,34 +175,6 @@ export function bindMontageCapabilityBridge<TAgent extends MontageAgentDescripto
         }
         return result;
       }
-      if (adapterCapability?.availability === "declared") {
-        throw capabilityError(
-          "capability.unavailable",
-          `Capability "${request.name}" requires an adapter implementation.`,
-        );
-      }
-
-      const stdSpec = STD_CAPABILITY_INDEX[request.source ?? request.name] ?? STD_CAPABILITY_INDEX[request.name];
-      if (stdSpec) {
-        if (stdSpec.effect !== request.effect) {
-          throw capabilityError(
-            "capability.effect-mismatch",
-            `Capability "${request.name}" is registered as "${stdSpec.effect}", not "${request.effect}".`,
-          );
-        }
-        if (!isStdCapabilityRuntimeAvailable(stdSpec.name)) {
-          throw capabilityError(
-            "capability.unavailable",
-            `Capability "${stdSpec.name}" requires an adapter implementation.`,
-          );
-        }
-        return invokeStdCapability(
-          state,
-          stdSpec.name,
-          request.effect as MontageCapabilityEffect,
-          request.args ?? [],
-        );
-      }
 
       if (previousInvoke) {
         return previousInvoke.call(previousHost, request);
@@ -201,16 +186,12 @@ export function bindMontageCapabilityBridge<TAgent extends MontageAgentDescripto
     }
   };
 
-  globalThis.MontageAOT = {
+  setArtifactHost({
     ...(previousHost ?? {}),
     invoke,
-  };
+  });
 
   return () => {
-    if (previousHost) {
-      globalThis.MontageAOT = previousHost;
-    } else {
-      delete globalThis.MontageAOT;
-    }
+    restoreArtifactHost(previousHost);
   };
 }

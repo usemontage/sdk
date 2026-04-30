@@ -8,7 +8,6 @@ export interface MontageToolsConfig {
   defaults?: {
     designSystem?: MontageDesignSystemConfig;
     outputQuality?: "default" | "high" | "xhigh";
-    backendType?: "fluxAOT" | "fluxUI";
     renderSurface?: {
       width?: number;
       height?: number;
@@ -76,7 +75,7 @@ function normalizeOutputQuality(
 
 const TOOL_DESCRIPTION = `Generate a rich, interactive HTML artifact — dashboards, charts, reports, tables, forms, pipelines, or any visual UI — from a natural-language render brief and structured data. Call this instead of returning markdown tables or plain-text lists whenever the user wants something visual.
 
-"prompt": A product-level render brief. Include the user goal, audience, workflow, entities, required interactions, constraints, and anti-goals. Do not emit FluxUI, Artifact IR, raw HTML, or a low-level layout blueprint.
+"prompt": A product-level render brief. Include the user goal, audience, workflow, entities, required interactions, constraints, and anti-goals. Do not emit internal source formats, raw HTML, or a low-level layout blueprint.
 "dataInfo": The actual data contract/data as a JSON string. Include real values when available, or explicit empty arrays/schemas/capabilities when the artifact starts empty. For import/upload workflows, include expected file types and row fields.
 "outputQuality": Use "default" only. Other values are ignored for now.
 "designSystem": Optional theme/branding override. Set brand colors, dark/light mode, typography.
@@ -101,7 +100,7 @@ const INPUT_SCHEMA: Record<string, unknown> = {
     prompt: {
       type: "string",
       description:
-        "Product-level render brief: goal, audience, workflow, entities, required interactions, constraints, and anti-goals. Do not emit FluxUI, Artifact IR, raw HTML, or a low-level layout blueprint.",
+        "Product-level render brief: goal, audience, workflow, entities, required interactions, constraints, and anti-goals. Do not emit internal source formats, raw HTML, or a low-level layout blueprint.",
     },
     dataInfo: {
       type: "string",
@@ -162,9 +161,6 @@ export function createMontageTools(config: MontageToolsConfig): MontageToolkit {
 
       if (designSystem) {
         body.designSystem = designSystem;
-      }
-      if (config.defaults?.backendType) {
-        body.backendType = config.defaults.backendType;
       }
       if (config.defaults?.renderSurface) {
         body.renderSurface = config.defaults.renderSurface;

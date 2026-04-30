@@ -1,13 +1,6 @@
 import { normalizeMontageDesignSystem } from "./public-types";
 import { MontageError } from "./errors";
-import {
-  STD_CAPABILITY_SPECS,
-  createStandardRuntimeState,
-  invokeStdCapability,
-  isStdCapabilityRuntimeAvailable,
-} from "./std-capabilities";
 import type {
-  MontageBackendType,
   MontageCapabilityInvokeRequest,
   MontageCapabilityManifest,
   MontageCapabilitySpec,
@@ -30,9 +23,6 @@ export interface MontageAdapterOptions<TAgent extends MontageAgentDescriptor> {
   mcpTools?: readonly string[];
   tools?: readonly MontageAdapterTool[];
   capabilities?: readonly MontageCapabilitySpec[];
-  std?: {
-    enabled?: boolean;
-  };
   invoke?: (
     request: MontageAdapterInvokeRequest,
   ) => Promise<MontageAdapterGenerateRequest> | MontageAdapterGenerateRequest;
@@ -59,11 +49,6 @@ const ADAPTER_OUTPUT_QUALITIES = new Set<MontageGenerateOutputQuality>([
   "xhigh",
 ]);
 
-const ADAPTER_BACKEND_TYPES = new Set<MontageBackendType>([
-  "fluxAOT",
-  "fluxUI",
-]);
-
 function isGenerateOutputQuality(
   value: unknown,
 ): value is MontageGenerateOutputQuality {
@@ -77,13 +62,6 @@ function normalizeGenerateOutputQuality(
   _value: MontageGenerateOutputQuality | undefined,
 ): MontageGenerateOutputQuality {
   return "default";
-}
-
-function isBackendType(value: unknown): value is MontageBackendType {
-  return (
-    typeof value === "string"
-    && ADAPTER_BACKEND_TYPES.has(value as MontageBackendType)
-  );
 }
 
 function normalizeRenderSurface(value: unknown): MontageRenderSurface | undefined {
@@ -260,14 +238,13 @@ function normalizeGenerateRequest(
       && key !== "dataInfo"
       && key !== "outputQuality"
       && key !== "designSystem"
-      && key !== "backendType"
       && key !== "renderSurface",
   );
 
   if (invalidKeys.length > 0) {
     throw new MontageError(
       "adapter.invalid-generate-request",
-      `Montage adapter output may only contain prompt, dataInfo, outputQuality, designSystem, backendType, and renderSurface. Found unsupported key(s): ${invalidKeys.join(", ")}.`,
+      `Montage adapter output may only contain prompt, dataInfo, outputQuality, designSystem, and renderSurface. Found unsupported key(s): ${invalidKeys.join(", ")}.`,
     );
   }
 
@@ -295,13 +272,6 @@ function normalizeGenerateRequest(
     );
   }
 
-  if (record.backendType !== undefined && !isBackendType(record.backendType)) {
-    throw new MontageError(
-      "adapter.invalid-generate-request",
-      'Montage adapter backendType must be "fluxAOT" or "fluxUI".',
-    );
-  }
-
   let designSystem: MontageAdapterGenerateRequest["designSystem"];
   if (record.designSystem !== undefined) {
     try {
@@ -323,7 +293,6 @@ function normalizeGenerateRequest(
       isGenerateOutputQuality(record.outputQuality) ? record.outputQuality : undefined,
     ),
     ...(designSystem ? { designSystem } : {}),
-    ...(isBackendType(record.backendType) ? { backendType: record.backendType } : {}),
     ...(renderSurface ? { renderSurface } : {}),
   };
 }
@@ -332,11 +301,7 @@ export function createMontageAdapter<TAgent extends MontageAgentDescriptor>(
   options: MontageAdapterOptions<TAgent>,
 ): MontageAdapter<TAgent> {
   const tools = [...(options.tools ?? [])].map(cloneTool);
-  const standardState = createStandardRuntimeState();
-  const capabilities = [
-    ...(options.capabilities ?? []),
-    ...(options.std?.enabled ? STD_CAPABILITY_SPECS : []),
-  ].map(cloneCapability);
+  const capabilities = [...(options.capabilities ?? [])].map(cloneCapability);
 
   return {
     agent: options.agent,
@@ -406,18 +371,6 @@ export function createMontageAdapter<TAgent extends MontageAgentDescriptor>(
         capability,
         capability.inputSchema ? capabilitySchemaValue(capability.inputSchema, args) : args,
       );
-
-      if (capability.availability === "runtime" && isStdCapabilityRuntimeAvailable(source)) {
-        const result = invokeStdCapability(
-          standardState,
-          source,
-          request.effect,
-          args,
-        );
-        return isPromiseLike(result)
-          ? result.then((resolved) => validateCapabilityResult(capability, resolved))
-          : validateCapabilityResult(capability, result);
-      }
 
       if (!options.invokeCapability) {
         throw new MontageError(

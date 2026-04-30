@@ -7,6 +7,7 @@ import {
   type MontageCapabilityBridgeErrorContext,
 } from "../capability-bridge";
 import type { MontageError } from "../errors";
+import type { MontageCapabilityInvokeRequest } from "../types";
 
 export interface MountedHtmlBlockOptions<
   TAgent extends MontageAgentDescriptor = MontageAgentDescriptor,
@@ -21,7 +22,20 @@ export interface MountedHtmlBlockOptions<
   ) => void;
 }
 
-const SCRIPT_BRIDGE_KEY = "__MONTAGE_SDK_AOT_BRIDGE__";
+const SCRIPT_BRIDGE_KEY = "__MONTAGE_SDK_CAPABILITY_BRIDGE__";
+
+interface MontageArtifactHost {
+  invoke?: (request: MontageCapabilityInvokeRequest) => unknown;
+  [key: string]: unknown;
+}
+
+type WindowWithMontageArtifactHost = Window & typeof globalThis & {
+  MontageAOT?: MontageArtifactHost;
+};
+
+function getGlobalArtifactHost(): MontageArtifactHost | undefined {
+  return (globalThis as typeof globalThis & { MontageAOT?: MontageArtifactHost }).MontageAOT;
+}
 
 interface ScriptSnapshot {
   attrs: Array<[string, string]>;
@@ -71,7 +85,7 @@ function createHtmlPayload(ownerDocument: Document, html: string): HtmlPayload {
 function appendExecutableScript(
   host: HTMLElement,
   snapshot: ScriptSnapshot,
-  bridgeHost?: typeof globalThis.MontageAOT,
+  bridgeHost?: MontageArtifactHost,
 ): void {
   const script = host.ownerDocument.createElement("script");
   script.async = false;
@@ -92,9 +106,7 @@ export function mountHtmlBlock<
   TAgent extends MontageAgentDescriptor = MontageAgentDescriptor,
 >(input: MountedHtmlBlockOptions<TAgent>): () => void {
   const { host } = input;
-  const hostWindow = host.ownerDocument.defaultView as
-    | (Window & typeof globalThis)
-    | null;
+  const hostWindow = host.ownerDocument.defaultView as WindowWithMontageArtifactHost | null;
   const previousWindowAot = hostWindow?.MontageAOT;
   const cleanupBridge = input.adapter
     ? bindMontageCapabilityBridge({
@@ -104,7 +116,7 @@ export function mountHtmlBlock<
         onError: input.onCapabilityError,
       })
     : () => {};
-  const bridgeHost = input.adapter ? globalThis.MontageAOT : undefined;
+  const bridgeHost = input.adapter ? getGlobalArtifactHost() : undefined;
 
   const payload = createHtmlPayload(host.ownerDocument, input.html);
   host.replaceChildren(payload.fragment);
