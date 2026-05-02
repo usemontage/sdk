@@ -1,4 +1,4 @@
-# `@montage/sdk`
+# `@montageai/sdk`
 
 The Montage SDK turns any LLM into a UI-rendering agent. Add `montage_generate`
 to your tool registry, hand the resulting HTML to the SDK's `<HtmlBlock>` (or
@@ -19,13 +19,13 @@ service. The package contains:
 ## Install
 
 ```bash
-pnpm add @montage/sdk
+pnpm add @montageai/sdk
 # or
-npm install @montage/sdk
+npm install @montageai/sdk
 ```
 
 `react` and `react-dom` are optional peer dependencies — only required if you
-use the `@montage/sdk/react` entry point.
+use the `@montageai/sdk/react` entry point.
 
 ## Quick start
 
@@ -38,7 +38,7 @@ Get an API key from https://console.usemontage.ai, then:
 
 ```ts
 import Anthropic from "@anthropic-ai/sdk";
-import { createMontageTools } from "@montage/sdk";
+import { createMontageTools } from "@montageai/sdk";
 
 const client = new Anthropic();
 const montage = createMontageTools({ apiKey: process.env.MONTAGE_API_KEY! });
@@ -112,9 +112,9 @@ conflict.
 
 ```ts
 import { z } from "zod";
-import { createMontageTools, integrations } from "@montage/sdk";
-import { createMontageAiSdkTool } from "@montage/sdk/ai-sdk";
-import { createMontageMastraTool } from "@montage/sdk/mastra";
+import { createMontageTools, integrations } from "@montageai/sdk";
+import { createMontageAiSdkTool } from "@montageai/sdk/ai-sdk";
+import { createMontageMastraTool } from "@montageai/sdk/mastra";
 
 const toolkit = createMontageTools({ apiKey: process.env.MONTAGE_API_KEY! });
 
@@ -138,8 +138,8 @@ For Vercel AI SDK, pass the direct adapter into `tool(...)`:
 ```ts
 import { tool } from "ai";
 import { z } from "zod";
-import { createMontageTools } from "@montage/sdk";
-import { createMontageAiSdkTool } from "@montage/sdk/ai-sdk";
+import { createMontageTools } from "@montageai/sdk";
+import { createMontageAiSdkTool } from "@montageai/sdk/ai-sdk";
 
 const toolkit = createMontageTools({ apiKey: process.env.MONTAGE_API_KEY! });
 
@@ -152,8 +152,8 @@ For Mastra, register the direct adapter with your agent's tool set:
 
 ```ts
 import { z } from "zod";
-import { createMontageTools } from "@montage/sdk";
-import { createMontageMastraTool } from "@montage/sdk/mastra";
+import { createMontageTools } from "@montageai/sdk";
+import { createMontageMastraTool } from "@montageai/sdk/mastra";
 
 const toolkit = createMontageTools({ apiKey: process.env.MONTAGE_API_KEY! });
 const montageGenerate = createMontageMastraTool(toolkit, z);
@@ -162,7 +162,7 @@ const montageGenerate = createMontageMastraTool(toolkit, z);
 ## Rendering generated HTML in React
 
 ```tsx
-import { HtmlBlock } from "@montage/sdk/react";
+import { HtmlBlock } from "@montageai/sdk/react";
 
 function Output({ result }: { result: { html: string } }) {
   return <HtmlBlock html={result.html} />;
@@ -174,8 +174,8 @@ inline scripts. Theme CSS, component CSS, event delegation, state updates, and
 DOM updates are owned by the artifact itself.
 
 ```tsx
-import { HtmlBlock } from "@montage/sdk/react";
-import { createMontageAdapter } from "@montage/sdk";
+import { HtmlBlock } from "@montageai/sdk/react";
+import { createMontageAdapter } from "@montageai/sdk";
 
 const adapter = createMontageAdapter({
   agent: { id: "ops", name: "Ops Agent" },
@@ -212,7 +212,7 @@ routes capabilities you explicitly register on the adapter.
 import {
   createMontageAdapter,
   bindMontageCapabilityBridge,
-} from "@montage/sdk";
+} from "@montageai/sdk";
 
 const adapter = createMontageAdapter({
   agent: { id: "ops", name: "Ops Agent" },
@@ -242,7 +242,7 @@ response). Validation problems inside the SDK surface as `MontageError` with a
 typed `code`.
 
 ```ts
-import { MontageApiError, MontageError } from "@montage/sdk";
+import { MontageApiError, MontageError } from "@montageai/sdk";
 
 try {
   await montage.execute({ prompt: "...", dataInfo: "{}" });
