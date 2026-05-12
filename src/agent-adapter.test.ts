@@ -27,7 +27,6 @@ describe("createMontageAdapter runtime contract", () => {
         return {
           prompt: "Generate the fundraising pipeline artifact.",
           dataInfo: "Sequoia Capital | stage=prospecting",
-          outputQuality: "high",
         };
       },
     });
@@ -45,7 +44,6 @@ describe("createMontageAdapter runtime contract", () => {
     ).resolves.toEqual({
       prompt: "Generate the fundraising pipeline artifact.",
       dataInfo: "Sequoia Capital | stage=prospecting",
-      outputQuality: "default",
     });
   });
 
@@ -62,7 +60,6 @@ describe("createMontageAdapter runtime contract", () => {
         return {
           prompt: "Generate the CRM workspace.",
           dataInfo: "Accounts and opportunities",
-          outputQuality: "high",
           designSystem: {
             label: "Acme Revenue OS",
             theme: "dark",
@@ -101,7 +98,6 @@ describe("createMontageAdapter runtime contract", () => {
         return {
           prompt: "Build a project command center.",
           dataInfo: "Projects, risks, milestones, and capacity.",
-          outputQuality: "xhigh",
           renderSurface: {
             width: 760,
             height: 720,
@@ -117,7 +113,6 @@ describe("createMontageAdapter runtime contract", () => {
     ).resolves.toEqual({
       prompt: "Build a project command center.",
       dataInfo: "Projects, risks, milestones, and capacity.",
-      outputQuality: "default",
       renderSurface: {
         width: 760,
         height: 720,
@@ -161,14 +156,12 @@ describe("createMontageAdapter runtime contract", () => {
         return {
           prompt: "Generate the fundraising pipeline artifact.",
           dataInfo: "Sequoia Capital | stage=prospecting",
-          outputQuality: "high",
           intent: {
             component: "html",
           },
         } as unknown as {
           prompt: string;
           dataInfo: string;
-          outputQuality: "high";
         };
       },
     });
@@ -193,7 +186,6 @@ describe("createMontageAdapter runtime contract", () => {
         return {
           prompt: "Build a project command center.",
           dataInfo: "Projects, risks, milestones, and capacity.",
-          outputQuality: "high",
           renderSurface: { width: -1 },
         } as never;
       },

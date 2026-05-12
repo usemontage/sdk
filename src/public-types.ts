@@ -1,10 +1,9 @@
 /**
  * Public types and minimal helpers used by the SDK's API-driven surface.
  *
- * Inlined here so the published `@montage/sdk` package does not depend on
- * any internal Montage workspace packages. These are TypeScript types only, plus a
- * couple of small validators / normalizers that the adapter layer uses at
- * runtime — no Zod schemas, no Montage-internal imports.
+ * Inlined here so the published SDK has no private package dependencies.
+ * These are TypeScript types only, plus a couple of small validators /
+ * normalizers that the adapter layer uses at runtime — no Zod schemas.
  */
 
 // ── Design system types ────────────────────────────────────────────────
@@ -198,6 +197,39 @@ function validateConfig(input: unknown): MontageDesignSystemConfig {
  * `MontageDesignSystem`. Mirrors the server-side normalization contract but
  * uses native validation instead of Zod so the SDK has no schema dep.
  */
+// ── Fragment output types ─────────────────────────────────────────────
+
+export interface MontageFragmentResult {
+  fragment: string;
+  styles?: string;
+  stylesheets?: string[];
+  scripts?: string[];
+  externalScripts?: string[];
+}
+
+export interface MontageGenerateFragmentResult {
+  id: string;
+  fragment: string;
+  styles?: string;
+  stylesheets?: string[];
+  scripts?: string[];
+  externalScripts?: string[];
+  creditsUsed: number;
+  html?: string;
+  artifactId?: string;
+  hostedUrl?: string;
+  diagnostics?: Array<{
+    code: string;
+    severity: "error" | "warning";
+    phase: string;
+    message: string;
+    path?: string;
+    suggestion?: string;
+    [key: string]: unknown;
+  }>;
+  resolution?: { kind: string; path: string; durationMs: number };
+}
+
 export function normalizeMontageDesignSystem(
   input?: MontageDesignSystem | MontageDesignSystemConfig | null,
 ): MontageDesignSystem {

@@ -17,8 +17,6 @@ export type SubmissionValue =
   | null
   | Array<string | number | File | boolean | Record<string, unknown> | null>;
 
-export type MontageGenerateOutputQuality = "default" | "high" | "xhigh";
-
 export interface MontageRenderSurface {
   width?: number;
   height?: number;
@@ -43,6 +41,10 @@ export interface MontageCapabilitySpec {
    * capability but the current host has not installed an implementation.
    */
   availability?: MontageCapabilityAvailability;
+  /** Hint describing when this capability should be selected by the LLM. */
+  useWhen?: string;
+  /** Names of alternative approaches this capability is preferred over. */
+  preferOver?: string[];
 }
 
 export interface MontageCapabilityInvokeRequest {
@@ -56,6 +58,14 @@ export interface MontageCapabilityInvokeRequest {
 export interface MontageCapabilityManifest {
   capabilities: MontageCapabilitySpec[];
 }
+
+export interface MontageGenerationResolution {
+  kind: string;
+  path: string;
+  durationMs: number;
+}
+
+export type MontageCapabilityErrorHandler = (error: Error) => void;
 
 export interface ArtifactRef {
   id: string;
@@ -89,7 +99,6 @@ export interface MontageAdapterInvokeRequest {
 export interface MontageAdapterGenerateRequest {
   prompt: string;
   dataInfo: string;
-  outputQuality: MontageGenerateOutputQuality;
   /**
    * Caller may pass a partial design-system config; the adapter normalizes
    * it to a full `MontageDesignSystem` before returning. Typed as the

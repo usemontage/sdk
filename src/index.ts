@@ -5,18 +5,23 @@ export type {
   MontageToolkit,
   MontageGenerateInput,
   MontageGenerateResult,
+  MontageGenerateStreamEvent,
+  MontageGenerationDiagnostic,
+  MontageStreamOptions,
+  MontageStreamResult,
+  MontageFragmentResult,
+  MontageGenerateFragmentResult,
 } from "./tools";
 export { MontageApiError } from "./tools";
 export { MontageError } from "./errors";
 export { createMontageAdapter } from "./agent-adapter";
 export { bindMontageCapabilityBridge } from "./capability-bridge";
-export { mountHtmlBlock } from "./html/mount-html-block";
 export {
-  createMontageAiSdkTool,
-  createMontageVercelAiTool,
-  montageAiSdkTool,
-} from "./ai-sdk";
-export { createMontageMastraTool, montageMastraTool } from "./mastra";
+  installCapabilityBridge,
+  uninstallCapabilityBridge,
+} from "./capability-bridge-runtime";
+export { mountHtmlBlock } from "./html/mount-html-block";
+export { mountShadowBlock } from "./html/mount-shadow-block";
 
 export type {
   MontageCapabilityAvailability,
@@ -38,13 +43,17 @@ export type {
   MontageAdapterGenerateRequest,
   MontageAdapterInvokeRequest,
   MontageAdapterTool,
-  MontageGenerateOutputQuality,
   MontageRenderSurface,
 } from "./types";
 export type {
   MontageCapabilityBridgeErrorContext,
   MontageCapabilityBridgeOptions,
 } from "./capability-bridge";
+export type {
+  CapabilityInvokeArgs,
+  InstallBridgeArgs,
+  InstallSdkBridgeArgs,
+  MontageAOTRuntime,
+} from "./capability-bridge-runtime";
 export type { MountedHtmlBlockOptions } from "./html/mount-html-block";
-export type { MontageAiSdkToolConfig } from "./ai-sdk";
-export type { MontageMastraTool } from "./mastra";
+export type { MountedShadowBlockOptions } from "./html/mount-shadow-block";

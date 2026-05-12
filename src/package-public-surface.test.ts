@@ -32,14 +32,45 @@ function collectSourceFiles(dir: string): string[] {
 }
 
 describe("package public surface", () => {
+  it("points package metadata at public production surfaces", () => {
+    expect(packageJson.homepage).toBe("https://usemontage.ai");
+    expect(packageJson.repository).toEqual({
+      type: "git",
+      url: "git+https://github.com/usemontage/sdk.git",
+    });
+  });
+
+  it("does not leak monorepo URLs or paths through package docs", () => {
+    const publicPackageFiles = [
+      join(sourceRoot, "../package.json"),
+      join(sourceRoot, "../README.md"),
+      join(sourceRoot, "../CONTRIBUTING.md"),
+      join(sourceRoot, "public-types.ts"),
+    ];
+    const privateFragments = [
+      ["github.com", ["montage", "dev"].join("-"), "montage"].join("/"),
+      ["montage", "dev"].join("."),
+      ["packages", "montage-sdk"].join("/"),
+      ["internal Montage", "workspace"].join(" "),
+      ["Montage", "internal"].join("-"),
+    ];
+
+    const offenders = publicPackageFiles.flatMap((filePath) => {
+      const content = readFileSync(filePath, "utf8");
+      return privateFragments
+        .filter((fragment) => content.includes(fragment))
+        .map((fragment) => `${relative(sourceRoot, filePath)} contains ${fragment}`);
+    });
+
+    expect(offenders).toEqual([]);
+  });
+
   it("publishes built dist entrypoints instead of source files", () => {
     expect(packageJson.main).toBe("./dist/index.js");
     expect(packageJson.types).toBe("./dist/index.d.ts");
 
     const exportsField = packageJson.exports as Record<string, unknown>;
     expect(Object.keys(exportsField)).not.toContain(`./${standardNamespace}-capabilities`);
-    expect(Object.keys(exportsField)).toContain("./mastra");
-    expect(Object.keys(exportsField)).toContain("./ai-sdk");
 
     const exportTargets = Object.values(exportsField).flatMap((entry) =>
       collectExportTargets(entry),

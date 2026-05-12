@@ -5,7 +5,6 @@ import type {
   MontageCapabilityManifest,
   MontageCapabilitySpec,
   MontageAdapterGenerateRequest,
-  MontageGenerateOutputQuality,
   MontageRenderSurface,
   MontageAdapterInvokeRequest,
   MontageAdapterTool,
@@ -41,27 +40,6 @@ export interface MontageAdapter<TAgent extends MontageAgentDescriptor> {
   getCapabilityManifest(): MontageCapabilityManifest;
   invoke(request: MontageAdapterInvokeRequest): Promise<MontageAdapterGenerateRequest>;
   invokeCapability(request: MontageCapabilityInvokeRequest): Promise<unknown> | unknown;
-}
-
-const ADAPTER_OUTPUT_QUALITIES = new Set<MontageGenerateOutputQuality>([
-  "default",
-  "high",
-  "xhigh",
-]);
-
-function isGenerateOutputQuality(
-  value: unknown,
-): value is MontageGenerateOutputQuality {
-  return (
-    typeof value === "string"
-    && ADAPTER_OUTPUT_QUALITIES.has(value as MontageGenerateOutputQuality)
-  );
-}
-
-function normalizeGenerateOutputQuality(
-  _value: MontageGenerateOutputQuality | undefined,
-): MontageGenerateOutputQuality {
-  return "default";
 }
 
 function normalizeRenderSurface(value: unknown): MontageRenderSurface | undefined {
@@ -226,7 +204,7 @@ function normalizeGenerateRequest(
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new MontageError(
       "adapter.invalid-generate-request",
-      "Montage adapters must return an object containing prompt, dataInfo, and optional outputQuality.",
+      "Montage adapters must return an object containing prompt and dataInfo.",
     );
   }
 
@@ -236,7 +214,6 @@ function normalizeGenerateRequest(
     (key) =>
       key !== "prompt"
       && key !== "dataInfo"
-      && key !== "outputQuality"
       && key !== "designSystem"
       && key !== "renderSurface",
   );
@@ -244,7 +221,7 @@ function normalizeGenerateRequest(
   if (invalidKeys.length > 0) {
     throw new MontageError(
       "adapter.invalid-generate-request",
-      `Montage adapter output may only contain prompt, dataInfo, outputQuality, designSystem, and renderSurface. Found unsupported key(s): ${invalidKeys.join(", ")}.`,
+      `Montage adapter output may only contain prompt, dataInfo, designSystem, and renderSurface. Found unsupported key(s): ${invalidKeys.join(", ")}.`,
     );
   }
 
@@ -259,16 +236,6 @@ function normalizeGenerateRequest(
     throw new MontageError(
       "adapter.invalid-generate-request",
       "Montage adapter output must include dataInfo as a string.",
-    );
-  }
-
-  if (
-    record.outputQuality !== undefined
-    && !isGenerateOutputQuality(record.outputQuality)
-  ) {
-    throw new MontageError(
-      "adapter.invalid-generate-request",
-      'Montage adapter outputQuality must be "default", "high", or "xhigh".',
     );
   }
 
@@ -289,9 +256,6 @@ function normalizeGenerateRequest(
   return {
     prompt: record.prompt,
     dataInfo: record.dataInfo,
-    outputQuality: normalizeGenerateOutputQuality(
-      isGenerateOutputQuality(record.outputQuality) ? record.outputQuality : undefined,
-    ),
     ...(designSystem ? { designSystem } : {}),
     ...(renderSurface ? { renderSurface } : {}),
   };

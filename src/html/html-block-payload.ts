@@ -4,6 +4,7 @@ export interface HtmlBlockPayload {
   styles?: string;
   stylesheets?: string[];
   scripts?: string[];
+  externalScripts?: string[];
 }
 
 export interface NormalizedHtmlBlockPayload {
@@ -11,6 +12,7 @@ export interface NormalizedHtmlBlockPayload {
   styles?: string;
   stylesheets?: string[];
   scripts?: string[];
+  externalScripts?: string[];
 }
 
 function uniqueStrings(values: readonly string[]): string[] {
@@ -33,6 +35,7 @@ function stringArray(value: unknown): string[] {
 export function extractHtmlBlockPayload(html: string): NormalizedHtmlBlockPayload {
   const stylesheets: string[] = [];
   const scripts: string[] = [];
+  const externalScripts: string[] = [];
   const styles: string[] = [];
 
   let withoutAssets = html.replace(
@@ -52,8 +55,11 @@ export function extractHtmlBlockPayload(html: string): NormalizedHtmlBlockPayloa
     return "";
   });
 
-  withoutAssets = withoutAssets.replace(/<script\b[^>]*>([\s\S]*?)<\/script>/gi, (_match, source: string) => {
-    if (source.trim()) {
+  withoutAssets = withoutAssets.replace(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi, (_match, attrs: string, source: string) => {
+    const srcMatch = attrs.match(/\bsrc=(["'])(.*?)\1/i);
+    if (srcMatch && srcMatch[2]?.trim()) {
+      externalScripts.push(srcMatch[2].trim());
+    } else if (source.trim()) {
       scripts.push(source.trim());
     }
     return "";
@@ -72,12 +78,14 @@ export function extractHtmlBlockPayload(html: string): NormalizedHtmlBlockPayloa
 
   const normalizedStylesheets = uniqueStrings(stylesheets);
   const normalizedScripts = uniqueStrings(scripts);
+  const normalizedExternalScripts = uniqueStrings(externalScripts);
 
   return {
     fragment,
     styles: styles.length > 0 ? styles.join("\n\n") : undefined,
     stylesheets: normalizedStylesheets.length > 0 ? normalizedStylesheets : undefined,
     scripts: normalizedScripts.length > 0 ? normalizedScripts : undefined,
+    externalScripts: normalizedExternalScripts.length > 0 ? normalizedExternalScripts : undefined,
   };
 }
 
@@ -101,11 +109,16 @@ export function normalizeHtmlBlockPayload(
     ...stringArray(fromHtml?.scripts),
     ...stringArray(input.scripts),
   ]);
+  const externalScripts = uniqueStrings([
+    ...stringArray(fromHtml?.externalScripts),
+    ...stringArray(input.externalScripts),
+  ]);
 
   return {
     fragment: fromHtml?.fragment ?? input.fragment ?? "",
     styles: styleParts.length > 0 ? styleParts.join("\n\n") : undefined,
     stylesheets: stylesheets.length > 0 ? stylesheets : undefined,
     scripts: scripts.length > 0 ? scripts : undefined,
+    externalScripts: externalScripts.length > 0 ? externalScripts : undefined,
   };
 }

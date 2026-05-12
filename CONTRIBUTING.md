@@ -1,4 +1,4 @@
-# Contributing to @montage/sdk
+# Contributing to @montageai/sdk
 
 Thanks for considering a contribution! The SDK is the API client used to call
 the Montage rendering service from JS/TS applications, framework adapters
@@ -7,17 +7,17 @@ the Montage rendering service from JS/TS applications, framework adapters
 ## Development setup
 
 ```bash
-git clone https://github.com/montage-dev/montage
-cd montage
+git clone https://github.com/usemontage/sdk
+cd sdk
 pnpm install
 ```
 
-The SDK lives in `packages/montage-sdk`.
+The package source lives in `src`.
 
 ## Running the test suite
 
 ```bash
-pnpm --filter @montage/sdk test
+pnpm test
 ```
 
 Tests are written in [Vitest](https://vitest.dev/). The suite covers:
@@ -32,22 +32,22 @@ Tests are written in [Vitest](https://vitest.dev/). The suite covers:
 ## Type checking
 
 ```bash
-pnpm --filter @montage/sdk typecheck
+pnpm typecheck
 ```
 
 ## Building
 
 ```bash
-pnpm --filter @montage/sdk build
+pnpm build
 ```
 
-Outputs `.js` + `.d.ts` to `packages/montage-sdk/dist`.
+Outputs `.js` + `.d.ts` to `dist`.
 
 ## Pull request guidelines
 
 - Include unit tests for any behavior change. New error paths in particular
   should be covered.
-- Run `pnpm --filter @montage/sdk typecheck && pnpm --filter @montage/sdk test`
+- Run `pnpm typecheck && pnpm test`
   before opening a PR.
 - Keep public surface changes minimal — the SDK is intentionally narrow. New
   exports should solve a real host integration problem.
@@ -56,6 +56,6 @@ Outputs `.js` + `.d.ts` to `packages/montage-sdk/dist`.
 
 ## Reporting issues
 
-File issues at https://github.com/montage-dev/montage/issues. Include a
+File issues at https://github.com/usemontage/sdk/issues. Include a
 minimal reproduction, your Node and SDK versions, and the relevant API
 response if applicable.

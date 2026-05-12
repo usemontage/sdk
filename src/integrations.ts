@@ -20,7 +20,7 @@ import type {
  * used by the adapters.  The real `z` from `"zod"` is a superset of this,
  * so the user's instance satisfies it without version conflicts.
  */
-export interface ZodLike {
+interface ZodLike {
   object: Function;
   string: Function;
   enum: Function;
@@ -50,37 +50,10 @@ function buildZodSchema(z: ZodLike): unknown {
     dataInfo: (z.string as Function)().describe(
       "Data contract/data as a JSON string, including empty arrays, schemas, capabilities, file types, and fields when relevant",
     ),
-    outputQuality: (z.enum as Function)(["default"])
-      .optional()
-      .describe('Render quality. Use "default" only.'),
     designSystem: (z.record as Function)((z.unknown as Function)())
       .optional()
       .describe("Optional branding override"),
   });
-}
-
-type ToolExecuteInput =
-  | MontageGenerateInput
-  | { context?: MontageGenerateInput; input?: MontageGenerateInput };
-
-function normalizeToolExecuteInput(input: ToolExecuteInput): MontageGenerateInput {
-  if (
-    input
-    && typeof input === "object"
-    && "context" in input
-    && input.context
-  ) {
-    return input.context;
-  }
-  if (
-    input
-    && typeof input === "object"
-    && "input" in input
-    && input.input
-  ) {
-    return input.input;
-  }
-  return input as MontageGenerateInput;
 }
 
 const JSON_SCHEMA = {
@@ -95,11 +68,6 @@ const JSON_SCHEMA = {
     dataInfo: {
       type: "string",
       description: "Data contract/data as a JSON string, including empty arrays, schemas, capabilities, file types, and fields when relevant",
-    },
-    outputQuality: {
-      type: "string",
-      enum: ["default"],
-      description: 'Render quality. Use "default" only.',
     },
     designSystem: {
       type: "object",
@@ -116,8 +84,8 @@ export function mastra(toolkit: MontageToolkit, z: ZodLike) {
     id: TOOL_NAME,
     description: TOOL_DESCRIPTION,
     inputSchema: buildZodSchema(z),
-    execute: async (input: ToolExecuteInput): Promise<MontageGenerateResult> =>
-      toolkit.execute(normalizeToolExecuteInput(input)),
+    execute: async (input: MontageGenerateInput): Promise<MontageGenerateResult> =>
+      toolkit.execute(input),
   };
 }
 
@@ -140,15 +108,11 @@ export function langchain(toolkit: MontageToolkit, z: ZodLike) {
 // tool() from "ai" accepts: { description, parameters: zodSchema, execute }
 
 export function vercelAi(toolkit: MontageToolkit, z: ZodLike) {
-  const schema = buildZodSchema(z);
   return {
     description: TOOL_DESCRIPTION,
-    // AI SDK v5 uses `inputSchema`; older Vercel AI SDK versions use `parameters`.
-    // Keep both so the adapter remains source-compatible across supported agents.
-    inputSchema: schema,
-    parameters: schema,
-    execute: async (input: ToolExecuteInput): Promise<MontageGenerateResult> =>
-      toolkit.execute(normalizeToolExecuteInput(input)),
+    parameters: buildZodSchema(z),
+    execute: async (input: MontageGenerateInput): Promise<MontageGenerateResult> =>
+      toolkit.execute(input),
   };
 }
 

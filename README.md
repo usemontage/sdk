@@ -9,6 +9,7 @@ The SDK is API-driven — every render goes through the Montage rendering
 service. The package contains:
 
 - A typed `createMontageTools()` factory that calls `POST /v1/generate`
+- Managed server-rendered streaming via `montage.stream()`
 - Framework adapters for Mastra, LangChain, and the Vercel AI SDK
 - A React `<HtmlBlock>` component that mounts self-contained bundled HTML and
   executes the artifact's inline scripts
@@ -29,12 +30,16 @@ use the `@montageai/sdk/react` entry point.
 
 ## Quick start
 
-Get an API key from https://console.usemontage.ai, then:
+Get an API key from [usemontage.ai](https://usemontage.ai), then:
 
 > `createMontageTools()` sends your API key as a Bearer token and should run in
 > trusted server-side code: API routes, workers, server actions, or agent
 > runtimes. Browser apps should call your server and render the returned HTML
 > with `<HtmlBlock>`.
+>
+> By default the SDK calls the production API at `https://api.usemontage.ai`.
+> Pass `apiUrl` only when Montage support directs you to use a different
+> endpoint.
 
 ```ts
 import Anthropic from "@anthropic-ai/sdk";
@@ -60,14 +65,65 @@ for (const block of response.content) {
 }
 ```
 
-`montage.execute({ prompt, dataInfo, outputQuality?, designSystem? })` returns
-`{ id, html, creditsUsed }`.
+`montage.execute({ prompt, dataInfo, interactive?, designSystem? })`
+returns `{ id, html, creditsUsed }`.
+
+`montage.stream(input, { target, onStatus?, onDone?, onError? })` is the
+default streaming path. The SDK mounts the server-rendered shell into an
+`HTMLElement` or `HTMLIFrameElement`, patches public stream slots as they arrive,
+and replaces the target with the final artifact on `done`.
+
+```ts
+const result = await montage.stream(
+  {
+    prompt: "Compare MacBook Pro vs Dell XPS for a CTO buying committee.",
+    dataInfo: JSON.stringify({ audience: "technical leaders" }),
+  },
+  {
+    target: document.querySelector("#artifact")!,
+    onStatus: (text) => console.log(text),
+  },
+);
+
+console.log(result.id, result.creditsUsed);
+```
+
+For diagnostics, `executeStreaming(input, onEvent)` remains available as the
+low-level raw event API. Raw stream events contain only status text, rendered
+HTML shell/slot/final payloads, and public slot/cache identifiers.
+
+`montage.executeFragment(...)` returns `{ id, fragment, styles, stylesheets, scripts, creditsUsed }` — separated parts for Shadow DOM mounting without iframe overhead.
 
 Use `prompt` as a product-level render brief, not an internal source format or
 low-level layout blueprint. A good brief names the goal, audience, workflow,
 entities, required interactions, starting state, constraints, and anti-goals.
 For import/upload workflows, say the artifact needs a real file picker and
 include expected file types and fields in `dataInfo`.
+
+### Static vs interactive
+
+Set `interactive: true` when the artifact should be a fully working app — state,
+handlers, add/import/edit/delete flows, search/filter that actually filters, and
+stateful workflows. Omit it or set `false` (the default) for static briefs,
+reports, comparisons, and board-ready dashboards.
+
+Charts and hover tooltips work in both modes. The flag controls whether the
+artifact has behavior, not whether it has visual interactivity.
+
+```ts
+// Interactive app — user can add, edit, filter, and delete rows
+const app = await montage.execute({
+  prompt: "Sales pipeline for an account executive. Include stage filters, next steps, and owner handoff.",
+  dataInfo: JSON.stringify({ deals: [] }),
+  interactive: true,
+});
+
+// Static report — polished read-only output
+const report = await montage.execute({
+  prompt: "Q4 revenue summary for the board. Show total revenue, growth, and top accounts.",
+  dataInfo: JSON.stringify({ revenue: metrics }),
+});
+```
 
 ## Design systems
 
@@ -98,7 +154,6 @@ You can also bake defaults into the toolkit:
 const montage = createMontageTools({
   apiKey: process.env.MONTAGE_API_KEY!,
   defaults: {
-    outputQuality: "default",
     designSystem: { theme: "dark", palette: "Notion" },
   },
 });
@@ -112,51 +167,21 @@ conflict.
 
 ```ts
 import { z } from "zod";
-import { createMontageTools, integrations } from "@montageai/sdk";
-import { createMontageAiSdkTool } from "@montageai/sdk/ai-sdk";
-import { createMontageMastraTool } from "@montageai/sdk/mastra";
+import { integrations, createMontageTools } from "@montageai/sdk";
 
 const toolkit = createMontageTools({ apiKey: process.env.MONTAGE_API_KEY! });
 
 // Mastra: { id, description, inputSchema, execute }
 const mastraTool = integrations.mastra(toolkit, z);
-const directMastraTool = createMontageMastraTool(toolkit, z);
 
 // LangChain: { name, description, schema, func }
 const langchainTool = integrations.langchain(toolkit, z);
 
-// Vercel AI SDK: { description, inputSchema, parameters, execute }
+// Vercel AI SDK: { description, parameters, execute }
 const aiTool = integrations.vercelAi(toolkit, z);
-const directAiTool = createMontageAiSdkTool(toolkit, z);
 
 // Generic JSON-schema definition
 const rawTool = integrations.raw(toolkit);
-```
-
-For Vercel AI SDK, pass the direct adapter into `tool(...)`:
-
-```ts
-import { tool } from "ai";
-import { z } from "zod";
-import { createMontageTools } from "@montageai/sdk";
-import { createMontageAiSdkTool } from "@montageai/sdk/ai-sdk";
-
-const toolkit = createMontageTools({ apiKey: process.env.MONTAGE_API_KEY! });
-
-export const tools = {
-  montage_generate: tool(createMontageAiSdkTool(toolkit, z)),
-};
-```
-
-For Mastra, register the direct adapter with your agent's tool set:
-
-```ts
-import { z } from "zod";
-import { createMontageTools } from "@montageai/sdk";
-import { createMontageMastraTool } from "@montageai/sdk/mastra";
-
-const toolkit = createMontageTools({ apiKey: process.env.MONTAGE_API_KEY! });
-const montageGenerate = createMontageMastraTool(toolkit, z);
 ```
 
 ## Rendering generated HTML in React
@@ -172,6 +197,16 @@ function Output({ result }: { result: { html: string } }) {
 `<HtmlBlock>` sets the bundled HTML into the host element and executes its
 inline scripts. Theme CSS, component CSS, event delegation, state updates, and
 DOM updates are owned by the artifact itself.
+
+For fragment mode (Shadow DOM, no iframe):
+
+```tsx
+import { HtmlBlock } from "@montageai/sdk/react";
+
+function FragmentOutput({ result }: { result: { fragment: string; styles: string } }) {
+  return <HtmlBlock fragment={result.fragment} styles={result.styles} mode="fragment" />;
+}
+```
 
 ```tsx
 import { HtmlBlock } from "@montageai/sdk/react";

@@ -2,10 +2,8 @@ import type {
   MontageAdapter,
   MontageAgentDescriptor,
 } from "../agent-adapter";
-import {
-  bindMontageCapabilityBridge,
-  type MontageCapabilityBridgeErrorContext,
-} from "../capability-bridge";
+import type { MontageCapabilityBridgeErrorContext } from "../capability-bridge";
+import { installCapabilityBridge } from "../capability-bridge-runtime";
 import type { MontageError } from "../errors";
 import type { MontageCapabilityInvokeRequest } from "../types";
 
@@ -109,11 +107,12 @@ export function mountHtmlBlock<
   const hostWindow = host.ownerDocument.defaultView as WindowWithMontageArtifactHost | null;
   const previousWindowAot = hostWindow?.MontageAOT;
   const cleanupBridge = input.adapter
-    ? bindMontageCapabilityBridge({
+    ? installCapabilityBridge({
+        mode: "sdk",
         adapter: input.adapter,
         context: input.context,
         root: host,
-        onError: input.onCapabilityError,
+        onCapabilityError: input.onCapabilityError,
       })
     : () => {};
   const bridgeHost = input.adapter ? getGlobalArtifactHost() : undefined;

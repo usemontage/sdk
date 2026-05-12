@@ -1,13 +1,12 @@
 {
-  "name": "@montage/sdk",
-  "version": "0.3.0",
+  "name": "@montageai/sdk",
+  "version": "0.3.1",
   "description": "Montage SDK — call the Montage API from any JS/TS app and render generated HTML artifacts.",
   "license": "MIT",
-  "homepage": "https://montage.dev",
+  "homepage": "https://usemontage.ai",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/montage-dev/montage.git",
-    "directory": "packages/montage-sdk"
+    "url": "git+https://github.com/usemontage/sdk.git"
   },
   "keywords": [
     "montage",
@@ -42,21 +41,13 @@
       "types": "./dist/tools.d.ts",
       "import": "./dist/tools.js"
     },
-    "./mastra": {
-      "types": "./dist/mastra.d.ts",
-      "import": "./dist/mastra.js"
-    },
-    "./ai-sdk": {
-      "types": "./dist/ai-sdk.d.ts",
-      "import": "./dist/ai-sdk.js"
-    },
     "./integrations": {
       "types": "./dist/integrations.d.ts",
       "import": "./dist/integrations.js"
     },
     "./html": {
-      "types": "./dist/html/mount-html-block.d.ts",
-      "import": "./dist/html/mount-html-block.js"
+      "types": "./dist/html/index.d.ts",
+      "import": "./dist/html/index.js"
     },
     "./react": {
       "types": "./dist/react/index.d.ts",
@@ -69,8 +60,8 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsup src/index.ts src/agent-adapter.ts src/capability-bridge.ts src/tools.ts src/integrations.ts src/mastra.ts src/ai-sdk.ts src/html/mount-html-block.ts src/react/index.ts --format esm --dts --clean --external react --external react-dom",
-    "dev": "tsup src/index.ts src/agent-adapter.ts src/capability-bridge.ts src/tools.ts src/integrations.ts src/mastra.ts src/ai-sdk.ts src/html/mount-html-block.ts src/react/index.ts --format esm --dts --watch --external react --external react-dom",
+    "build": "tsup src/index.ts src/agent-adapter.ts src/capability-bridge.ts src/tools.ts src/integrations.ts src/html/index.ts src/html/mount-html-block.ts src/html/mount-iframe-html-block.ts src/react/index.ts --format esm --dts --clean --external react --external react-dom",
+    "dev": "tsup src/index.ts src/agent-adapter.ts src/capability-bridge.ts src/tools.ts src/integrations.ts src/html/mount-html-block.ts src/react/index.ts --format esm --dts --watch --external react --external react-dom",
     "prepack": "pnpm run build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --config /dev/null",
@@ -90,6 +81,7 @@
     }
   },
   "devDependencies": {
+    "@types/node": "^22.10.5",
     "@types/react": "^19.0.7",
     "@types/react-dom": "^19.0.3",
     "jsdom": "^25.0.0",
