@@ -19,7 +19,6 @@ export interface MontageAgentDescriptor {
 
 export interface MontageAdapterOptions<TAgent extends MontageAgentDescriptor> {
   agent: TAgent;
-  mcpTools?: readonly string[];
   tools?: readonly MontageAdapterTool[];
   capabilities?: readonly MontageCapabilitySpec[];
   invoke?: (
@@ -32,7 +31,6 @@ export interface MontageAdapterOptions<TAgent extends MontageAgentDescriptor> {
 
 export interface MontageAdapter<TAgent extends MontageAgentDescriptor> {
   readonly agent: TAgent;
-  readonly mcpTools: readonly string[];
   readonly tools: readonly MontageAdapterTool[];
   readonly capabilities: readonly MontageCapabilitySpec[];
   listTools(): readonly MontageAdapterTool[];
@@ -269,7 +267,6 @@ export function createMontageAdapter<TAgent extends MontageAgentDescriptor>(
 
   return {
     agent: options.agent,
-    mcpTools: [...(options.mcpTools ?? [])],
     tools,
     capabilities,
     listTools() {

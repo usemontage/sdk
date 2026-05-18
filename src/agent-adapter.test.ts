@@ -5,14 +5,13 @@ import { createMontageAdapter } from "./agent-adapter";
 const companyAgent = {
   id: "agent-x",
   name: "Agent X",
-  capabilities: ["query crm", "call Montage MCP tools"],
+  capabilities: ["query crm", "agent tools"],
 };
 
 describe("createMontageAdapter runtime contract", () => {
   it("lists tools and invokes them as Montage generate requests", async () => {
     const adapter = createMontageAdapter({
       agent: companyAgent,
-      mcpTools: ["generate"],
       tools: [
         {
           name: "fundraising.show-pipeline",

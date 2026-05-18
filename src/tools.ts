@@ -186,7 +186,7 @@ const TOOL_DESCRIPTION = `Generate a rich, interactive HTML artifact — dashboa
 "data": Optional pre-fetched data for static accuracy or initial render. Use adapter capabilities for data that must stay live after the artifact is shipped or hosted.
 "hosted": Set to true when the final artifact should be persisted and returned with a stable hosted URL.
 "strictData": Defaults to true. Montage fails closed when required fields or capabilities cannot be validated.
-"requiredFields" and "requiredCapabilities": Use these for must-not-omit data contracts. Required capabilities are rendered through MontageAOT.invoke.
+"requiredFields" and "requiredCapabilities": Use these for must-not-omit data contracts. Required capabilities are dispatched through the capability bridge at render time.
 "interactive": Set to true ONLY when the user wants a fully working app — state, controls that mutate data, add/import/edit/delete flows, search/filter that actually filters, etc. Set to false (default) for briefs, reports, comparisons, summaries, dashboards-as-screenshots, and any read-only artifact. Charts and tooltips work in either mode; this flag is about whether the artifact has behavior, not whether it has hover effects.
 "designSystem": Optional theme/branding override. Set brand colors, dark/light mode, typography.
 
@@ -310,6 +310,34 @@ const STREAM_TRANSITION_CSS = `
 [data-mtg-stream-slot]{opacity:0;transform:translateY(8px);transition:opacity .32s ease,transform .32s ease}
 [data-mtg-stream-slot][data-mtg-stream-filled]{opacity:1;transform:translateY(0)}
 @keyframes mtg-stream-reveal{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes mtg-stream-enter{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes mtg-stream-number{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:scale(1)}}
+@keyframes mtg-stream-bar{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+@keyframes mtg-stream-line{from{stroke-dashoffset:var(--mtg-dash-len,1000)}to{stroke-dashoffset:0}}
+.mtg-stream-enter{animation:mtg-stream-enter .34s cubic-bezier(.25,.46,.45,.94) both}
+.mtg-stream-enter .mtg-report-stat-value,
+.mtg-stream-enter .mtg-stat-value{animation:mtg-stream-number .36s cubic-bezier(.25,.46,.45,.94) .12s both}
+.mtg-stream-enter .mtg-report-stat-card{animation:mtg-stream-enter .32s cubic-bezier(.25,.46,.45,.94) both}
+.mtg-stream-enter .mtg-report-stat-card:nth-child(2){animation-delay:60ms}
+.mtg-stream-enter .mtg-report-stat-card:nth-child(3){animation-delay:120ms}
+.mtg-stream-enter .mtg-report-stat-card:nth-child(4){animation-delay:180ms}
+.mtg-stream-enter .mtg-report-stat-card:nth-child(n+5){animation-delay:220ms}
+.mtg-stream-enter .mtg-stat-cell{animation:mtg-stream-enter .28s cubic-bezier(.25,.46,.45,.94) both}
+.mtg-stream-enter .mtg-stat-cell:nth-child(2){animation-delay:50ms}
+.mtg-stream-enter .mtg-stat-cell:nth-child(3){animation-delay:100ms}
+.mtg-stream-enter .mtg-stat-cell:nth-child(n+4){animation-delay:140ms}
+.mtg-stream-enter .mtg-chart-mark{animation:mtg-stream-enter .3s cubic-bezier(.25,.46,.45,.94) both}
+.mtg-stream-enter .mtg-chart-mark:nth-child(2){animation-delay:40ms}
+.mtg-stream-enter .mtg-chart-mark:nth-child(3){animation-delay:80ms}
+.mtg-stream-enter .mtg-chart-mark:nth-child(4){animation-delay:120ms}
+.mtg-stream-enter .mtg-chart-mark:nth-child(5){animation-delay:160ms}
+.mtg-stream-enter .mtg-chart-mark:nth-child(n+6){animation-delay:200ms}
+.mtg-stream-enter .mtg-report-chart-svg[data-mtg-chart-type="bar"] .mtg-chart-mark rect[fill]:not([fill="none"]){transform-origin:bottom center;animation:mtg-stream-bar .44s cubic-bezier(.25,.46,.45,.94) both;animation-delay:inherit}
+.mtg-stream-enter .mtg-report-chart-svg polyline[stroke]{stroke-dasharray:var(--mtg-dash-len,1000);animation:mtg-stream-line .7s cubic-bezier(.25,.46,.45,.94) .15s both}
+.mtg-stream-enter .mtg-chart-legend{animation:mtg-stream-enter .28s cubic-bezier(.25,.46,.45,.94) .2s both}
+.mtg-stream-enter .mtg-report-stat-change{animation:mtg-stream-number .28s cubic-bezier(.25,.46,.45,.94) .22s both}
+.mtg-stream-enter .mtg-report-stat-spark{animation:mtg-stream-enter .4s cubic-bezier(.25,.46,.45,.94) .18s both}
+@media(prefers-reduced-motion:reduce){.mtg-stream-enter,.mtg-stream-enter *{animation:none!important}}
 `;
 
 function injectStreamTransitionStyle(doc: Document): void {
@@ -434,13 +462,31 @@ function patchStreamSlot(
   }
   slotElement.setAttribute("aria-busy", "false");
 
+  const alreadyFilled = slotElement.hasAttribute("data-mtg-stream-filled");
+
   if (isNew) {
-    requestAnimationFrame(() => {
-      slotElement!.setAttribute("data-mtg-stream-filled", "true");
-    });
-  } else {
+    const rAF = ownerDocument.defaultView?.requestAnimationFrame;
+    if (rAF) {
+      rAF(() => slotElement!.setAttribute("data-mtg-stream-filled", "true"));
+    } else {
+      slotElement.setAttribute("data-mtg-stream-filled", "true");
+    }
+  } else if (!alreadyFilled) {
     slotElement.setAttribute("data-mtg-stream-filled", "true");
   }
+
+  if (!alreadyFilled) {
+    let delay = 0;
+    for (const child of Array.from(slotElement.children)) {
+      const el = child as HTMLElement;
+      if (el.nodeType === 1 && el.tagName !== "STYLE") {
+        el.classList.add("mtg-stream-enter");
+        el.style.animationDelay = `${delay}ms`;
+        delay += 60;
+      }
+    }
+  }
+
 }
 
 function createGenerateBody(

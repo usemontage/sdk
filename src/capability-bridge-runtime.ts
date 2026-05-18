@@ -17,8 +17,14 @@ export interface CapabilityInvokeArgs {
   context?: unknown;
 }
 
+export interface PdfExportArgs {
+  root: HTMLElement;
+  filename?: string;
+}
+
 export interface MontageAOTRuntime {
   invoke(args: CapabilityInvokeArgs): Promise<unknown>;
+  exportToPdf?(args: PdfExportArgs): Promise<void>;
   [key: string]: unknown;
 }
 
@@ -240,6 +246,45 @@ function removeInstalledBridge(bridge: InstalledBridge): void {
   if (index >= 0) installedBridges.splice(index, 1);
 }
 
+let pdfLibsPromise: Promise<{ html2canvas: (el: HTMLElement, opts: Record<string, unknown>) => Promise<HTMLCanvasElement>; jsPDF: new (opts: Record<string, unknown>) => { addPage(): void; addImage(data: string, format: string, x: number, y: number, w: number, h: number): void; save(filename: string): void } }> | null = null;
+
+function loadPdfLibs() {
+  if (pdfLibsPromise) return pdfLibsPromise;
+  pdfLibsPromise = new Promise((resolve, reject) => {
+    const s1 = document.createElement("script");
+    s1.src = "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
+    s1.onload = () => {
+      const s2 = document.createElement("script");
+      s2.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js";
+      s2.onload = () => resolve({ html2canvas: (globalThis as any).html2canvas, jsPDF: (globalThis as any).jspdf.jsPDF });
+      s2.onerror = () => reject(new Error("Failed to load jsPDF"));
+      document.head.appendChild(s2);
+    };
+    s1.onerror = () => reject(new Error("Failed to load html2canvas"));
+    document.head.appendChild(s1);
+  });
+  return pdfLibsPromise;
+}
+
+async function defaultExportToPdf(args: PdfExportArgs): Promise<void> {
+  const libs = await loadPdfLibs();
+  const canvas = await libs.html2canvas(args.root, { scale: 2, useCORS: true, logging: false, backgroundColor: "#ffffff" });
+  const imgWidth = 210;
+  const pageHeight = 297;
+  const imgHeight = canvas.height * imgWidth / canvas.width;
+  const pdf = new libs.jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
+  let position = 0;
+  const imgData = canvas.toDataURL("image/png");
+  while (position < imgHeight) {
+    if (position > 0) pdf.addPage();
+    pdf.addImage(imgData, "PNG", 0, -position, imgWidth, imgHeight);
+    position += pageHeight;
+  }
+  let filename = args.filename ?? "report.pdf";
+  if (!/\.pdf$/i.test(filename)) filename += ".pdf";
+  pdf.save(filename);
+}
+
 export function installCapabilityBridge<
   TAgent extends MontageAgentDescriptor = MontageAgentDescriptor,
 >(args: InstallBridgeArgs<TAgent>): () => void {
@@ -306,6 +351,7 @@ export function installCapabilityBridge<
   const host: MontageAOTRuntime = {
     ...(previousHost ?? {}),
     invoke,
+    exportToPdf: previousHost?.exportToPdf ?? defaultExportToPdf,
   };
   setGlobalMontageAOT(host);
 

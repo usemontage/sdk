@@ -77,10 +77,11 @@ export function mountShadowBlock<
     }
   }
 
-  // Inject inline styles.
+  // Inject inline styles — rewrite document-level selectors so they apply
+  // inside the shadow tree instead of targeting the outer document.
   if (styles) {
     const style = document.createElement("style");
-    style.textContent = styles;
+    style.textContent = adaptCssForShadowDom(styles);
     root.appendChild(style);
   }
 
@@ -89,6 +90,12 @@ export function mountShadowBlock<
   container.className = "mtg-fragment-root";
   container.innerHTML = fragment;
   root.appendChild(container);
+
+  // Auto-install chart tooltip hover behavior when the fragment contains
+  // data-mtg-tooltip marks (emitted by atlas chart section renderers).
+  if (fragment.includes("data-mtg-tooltip")) {
+    installShadowTooltips(root, container);
+  }
 
   function runInlineScripts(): void {
     if (!scripts) return;
@@ -127,4 +134,53 @@ export function mountShadowBlock<
     cleanupBridge();
     root.replaceChildren();
   };
+}
+
+function installShadowTooltips(root: ShadowRoot, container: HTMLElement): void {
+  const tipCss = document.createElement("style");
+  tipCss.textContent = [
+    "[data-mtg-tooltip] { transition: opacity 180ms ease, filter 180ms ease; cursor: crosshair; }",
+    "[data-mtg-tooltip]:hover { filter: drop-shadow(0 8px 12px rgba(15,23,42,.18)); opacity: .9; }",
+  ].join("\n");
+  root.insertBefore(tipCss, container);
+
+  let tip: HTMLDivElement | null = null;
+  function ensureTip(): HTMLDivElement {
+    if (tip) return tip;
+    tip = document.createElement("div");
+    tip.setAttribute("role", "status");
+    tip.style.cssText =
+      "position:fixed;left:0;top:0;z-index:2147483646;pointer-events:none;opacity:0;" +
+      "transform:translate3d(0,0,0) scale(.98);transition:opacity 120ms ease,transform 120ms ease;" +
+      "padding:7px 9px;border-radius:10px;background:rgba(17,24,39,.94);color:#fff;" +
+      "font:700 12px/1.25 Inter,ui-sans-serif,system-ui,sans-serif;" +
+      "box-shadow:0 16px 40px rgba(15,23,42,.22);max-width:260px;white-space:nowrap";
+    document.body.appendChild(tip);
+    return tip;
+  }
+  root.addEventListener("pointerover", (e: Event) => {
+    const pe = e as PointerEvent;
+    const target = (pe.target as Element)?.closest?.("[data-mtg-tooltip]");
+    if (!target) return;
+    const text = target.getAttribute("data-mtg-tooltip");
+    if (!text) return;
+    const el = ensureTip();
+    el.textContent = text;
+    const x = pe.clientX || 0;
+    const y = pe.clientY || 0;
+    el.style.transform = `translate3d(${Math.min(Math.max(8, x + 14), window.innerWidth - 200)}px,${Math.max(8, y - 40)}px,0) scale(1)`;
+    el.style.opacity = "1";
+  });
+  root.addEventListener("pointerout", (e: Event) => {
+    const pe = e as PointerEvent;
+    const target = (pe.target as Element)?.closest?.("[data-mtg-tooltip]");
+    if (target && tip) tip.style.opacity = "0";
+  });
+}
+
+function adaptCssForShadowDom(css: string): string {
+  return css
+    .replace(/:root/g, ":host")
+    .replace(/(?:html\s*,\s*body|body\s*,\s*html)\s*\{[^}]*\}/g, "")
+    .replace(/(?<![.\-\w])body\s*\{[^}]*\}/g, "");
 }

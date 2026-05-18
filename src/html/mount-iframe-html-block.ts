@@ -107,13 +107,18 @@ export function mountIframeHtmlBlock<
       }
 
       const measure = () => {
-        const next = Math.max(
+        let contentHeight = Math.max(
           doc.documentElement?.scrollHeight ?? 0,
           doc.body?.scrollHeight ?? 0,
           minHeight,
         );
-        iframe.style.height = `${next}px`;
-        if (onResize) onResize(next);
+        if (contentHeight <= minHeight && doc.body) {
+          const bodyStyle = doc.defaultView?.getComputedStyle(doc.body);
+          const explicitMinH = parseInt(bodyStyle?.minHeight ?? "0", 10);
+          if (explicitMinH > contentHeight) contentHeight = explicitMinH;
+        }
+        iframe.style.height = `${contentHeight}px`;
+        if (onResize) onResize(contentHeight);
       };
       measure();
 

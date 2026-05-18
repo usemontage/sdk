@@ -39,10 +39,11 @@ export function extractHtmlBlockPayload(html: string): NormalizedHtmlBlockPayloa
   const styles: string[] = [];
 
   let withoutAssets = html.replace(
-    /<link\b[^>]*rel=(["'])stylesheet\1[^>]*href=(["'])(.*?)\2[^>]*>/gi,
-    (_match, _relQuote, _hrefQuote, href: string) => {
-      if (href.trim()) {
-        stylesheets.push(href.trim());
+    /<link\b[^>]*?\brel=(["'])stylesheet\1[^>]*>/gi,
+    (match) => {
+      const hrefMatch = match.match(/\bhref=(["'])(.*?)\1/i);
+      if (hrefMatch && hrefMatch[2]?.trim()) {
+        stylesheets.push(hrefMatch[2].trim());
       }
       return "";
     },

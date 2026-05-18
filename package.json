@@ -1,6 +1,6 @@
 {
   "name": "@montageai/sdk",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Montage SDK — call the Montage API from any JS/TS app and render generated HTML artifacts.",
   "license": "MIT",
   "homepage": "https://usemontage.ai",
