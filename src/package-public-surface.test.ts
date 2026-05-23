@@ -40,24 +40,24 @@ describe("package public surface", () => {
     });
   });
 
-  it("does not leak monorepo URLs or paths through package docs", () => {
+  it("does not expose non-public URLs or paths through package docs", () => {
     const publicPackageFiles = [
       join(sourceRoot, "../package.json"),
       join(sourceRoot, "../README.md"),
       join(sourceRoot, "../CONTRIBUTING.md"),
       join(sourceRoot, "public-types.ts"),
     ];
-    const privateFragments = [
+    const forbiddenFragments = [
       ["github.com", ["montage", "dev"].join("-"), "montage"].join("/"),
       ["montage", "dev"].join("."),
       ["packages", "montage-sdk"].join("/"),
-      ["internal Montage", "workspace"].join(" "),
-      ["Montage", "internal"].join("-"),
+      [["inter", "nal"].join(""), "Montage", ["work", "space"].join("")].join(" "),
+      ["Montage", ["inter", "nal"].join("")].join("-"),
     ];
 
     const offenders = publicPackageFiles.flatMap((filePath) => {
       const content = readFileSync(filePath, "utf8");
-      return privateFragments
+      return forbiddenFragments
         .filter((fragment) => content.includes(fragment))
         .map((fragment) => `${relative(sourceRoot, filePath)} contains ${fragment}`);
     });

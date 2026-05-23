@@ -95,7 +95,7 @@ HTML shell/slot/final payloads, and public slot/cache identifiers.
 
 `montage.executeFragment(...)` returns `{ id, fragment, styles, stylesheets, scripts, creditsUsed }` — separated parts for Shadow DOM mounting without iframe overhead.
 
-Use `prompt` as a product-level render brief, not an internal source format or
+Use `prompt` as a product-level render brief, not an implementation-only source format or
 low-level layout blueprint. A good brief names the goal, audience, workflow,
 entities, required interactions, starting state, constraints, and anti-goals.
 For import/upload workflows, say the artifact needs a real file picker and

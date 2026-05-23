@@ -1,7 +1,7 @@
 /**
  * Public types and minimal helpers used by the SDK's API-driven surface.
  *
- * Inlined here so the published SDK has no private package dependencies.
+ * Inlined here so the published SDK has no non-public package dependencies.
  * These are TypeScript types only, plus a couple of small validators /
  * normalizers that the adapter layer uses at runtime — no Zod schemas.
  */

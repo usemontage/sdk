@@ -1,4 +1,4 @@
-# Contributing to @montage/sdk
+# Contributing to @montageai/sdk
 
 Thanks for considering a contribution! The SDK is the API client used to call
 the Montage rendering service from JS/TS applications, framework adapters

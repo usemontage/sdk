@@ -36,7 +36,7 @@ const TOOL_DESCRIPTION =
   "Generate a rich, interactive HTML artifact — dashboards, charts, reports, " +
   "tables, forms — from a product-level render brief and structured data. " +
   "The prompt should describe goal, audience, workflow, entities, interactions, " +
-  "constraints, and anti-goals; it should not contain internal source formats, raw HTML, " +
+  "constraints, and anti-goals; it should not contain implementation-only source formats, raw HTML, " +
   "or a low-level layout blueprint. Upgrade vague user requests before calling: include starting state " +
   "(empty vs seeded), required controls, real file picker requirements for import/upload workflows, " +
   "data fields, design constraints, and anti-goals such as not a report or not a landing page. " +
@@ -63,7 +63,7 @@ const JSON_SCHEMA = {
     prompt: {
       type: "string",
       description:
-        "Product-level render brief: goal, audience, workflow, entities, required interactions, constraints, and anti-goals. Do not emit internal source formats, raw HTML, or a low-level layout blueprint.",
+        "Product-level render brief: goal, audience, workflow, entities, required interactions, constraints, and anti-goals. Do not emit implementation-only source formats, raw HTML, or a low-level layout blueprint.",
     },
     dataInfo: {
       type: "string",
