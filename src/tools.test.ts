@@ -466,48 +466,6 @@ describe("createMontageTools", () => {
       expect(url).toBe("https://custom.example.com//v1/generate");
     });
 
-    it("uses the local development API when environment is development", async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ id: "gen_1", html: "<p/>", creditsUsed: 1 }),
-      });
-
-      const tools = createMontageTools({
-        apiKey: "sk_test",
-        environment: "development",
-      });
-      await tools.execute({ prompt: "prompt", dataInfo: "{}" });
-
-      const [url] = mockFetch.mock.calls[0];
-      expect(url).toBe("http://localhost:8787/v1/generate");
-    });
-
-    it("rejects local apiUrl unless environment is development", () => {
-      expect(() =>
-        createMontageTools({
-          apiKey: "sk_test",
-          apiUrl: "http://localhost:8787",
-        }),
-      ).toThrow('Local Montage API URLs require environment: "development".');
-    });
-
-    it("allows a local apiUrl when environment is development", async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ id: "gen_1", html: "<p/>", creditsUsed: 1 }),
-      });
-
-      const tools = createMontageTools({
-        apiKey: "sk_test",
-        environment: "development",
-        apiUrl: "http://127.0.0.1:3000",
-      });
-      await tools.execute({ prompt: "prompt", dataInfo: "{}" });
-
-      const [url] = mockFetch.mock.calls[0];
-      expect(url).toBe("http://127.0.0.1:3000/v1/generate");
-    });
-
     it("includes config.defaults.designSystem in the request body", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,

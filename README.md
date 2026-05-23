@@ -39,9 +39,8 @@ Get an API key from [usemontage.ai](https://usemontage.ai), then:
 > with `<HtmlBlock>`.
 >
 > By default the SDK calls the production API at `https://api.usemontage.ai`.
-> For local development, opt in with `environment: "development"` to target
-> `http://localhost:8787`. Local `apiUrl` values are rejected unless this
-> development gate is explicit.
+> Pass `apiUrl` only when Montage support directs you to use a different
+> endpoint.
 
 ```ts
 import Anthropic from "@anthropic-ai/sdk";
@@ -147,15 +146,6 @@ const result = await montage.execute({
       background: "#0A0E1A",
     },
   },
-});
-```
-
-For local API development:
-
-```ts
-const montage = createMontageTools({
-  apiKey: process.env.MONTAGE_API_KEY!,
-  environment: "development",
 });
 ```
 
