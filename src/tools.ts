@@ -149,7 +149,7 @@ export interface MontageStreamOptions {
   onError?: (error: MontageApiError) => void;
   /**
    * Advanced diagnostic hook. The default SDK path applies shell/slot/done
-   * internally and only exposes public rendered HTML events here.
+   * events before exposing public rendered HTML updates here.
    */
   onEvent?: (event: MontageGenerateStreamEvent, rawChunk: string) => void;
 }
@@ -397,13 +397,11 @@ function writeIframeDocument(iframe: HTMLIFrameElement, html: string): void {
 
 // Streaming entrance: choreographed fade-in for each slot as it arrives.
 //
-// CONTRACT WITH THE RENDERER:
+// Streaming layout note:
 //   CSS `transform` on an SVG element fully REPLACES its `transform` attribute
 //   (they don't compose — see CSS Transforms Level 1). So any SVG <g> with a
 //   class targeted below MUST NOT carry a `transform=""` attribute; positioning
-//   transforms must live on an unclassed outer <g> wrapper. The atlas chart
-//   renderer enforces this (see chart/index.html `legend()` helper).
-//   The invariant is verified by atlas-chart-animation-contract.test.ts.
+//   transforms must live on an unclassed outer <g> wrapper.
 const STREAM_TRANSITION_CSS = `
 [data-mtg-stream-slot]:not([data-mtg-stream-filled]){display:none}
 [data-mtg-stream-slot][data-mtg-stream-filled]{display:block;width:100%;max-width:100%;min-width:0;opacity:0;transform:translateY(8px);animation:mtg-stream-enter .34s cubic-bezier(.25,.46,.45,.94) both}

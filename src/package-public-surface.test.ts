@@ -14,6 +14,13 @@ const standardCapabilityFragments = [
   ["STD", "_CAPABILITY"].join(""),
   ["runtime", "-capabilities"].join(""),
 ];
+const implementationLeakFragments = [
+  ["flux", "ui"].join(""),
+  ["packages", "montage"].join("/"),
+  ["mono", "repo"].join(""),
+  [["inter", "nal"].join(""), "source"].join(" "),
+  [["inter", "nal"].join(""), "logic"].join(" "),
+];
 
 function collectExportTargets(value: unknown): string[] {
   if (typeof value === "string") return [value];
@@ -99,6 +106,26 @@ describe("package public surface", () => {
         );
         return matches.map((fragment) => `${relative(sourceRoot, filePath)} contains ${fragment}`);
       });
+
+    expect(offenders).toEqual([]);
+  });
+
+  it("does not mention backend implementation families in source or docs", () => {
+    const publicFiles = [
+      join(sourceRoot, "../package.json"),
+      join(sourceRoot, "../README.md"),
+      join(sourceRoot, "../CONTRIBUTING.md"),
+      ...collectSourceFiles(sourceRoot).filter(
+        (filePath) => relative(sourceRoot, filePath) !== publicSurfaceTestFile,
+      ),
+    ];
+
+    const offenders = publicFiles.flatMap((filePath) => {
+      const content = readFileSync(filePath, "utf8").toLowerCase();
+      return implementationLeakFragments
+        .filter((fragment) => content.includes(fragment))
+        .map((fragment) => `${relative(sourceRoot, filePath)} contains ${fragment}`);
+    });
 
     expect(offenders).toEqual([]);
   });
