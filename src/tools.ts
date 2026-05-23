@@ -19,8 +19,15 @@ export type {
   MontageGenerateFragmentResult,
 } from "./public-types";
 
+export type MontageApiEnvironment = "production" | "development";
+
 export interface MontageToolsConfig {
   apiKey: string;
+  /**
+   * Defaults to `production`. Set to `development` to target the local
+   * development API without passing an explicit `apiUrl`.
+   */
+  environment?: MontageApiEnvironment;
   apiUrl?: string;
   defaults?: {
     designSystem?: MontageDesignSystemConfig;
@@ -47,6 +54,8 @@ export interface MontageGenerateInput {
   requiredFields?: string[];
   requiredCapabilities?: string[];
   cache?: "read-write" | "read" | "write" | "skip" | "read-through";
+  /** True when mutable app collections should start empty rather than seeded. */
+  zeroed?: boolean;
   /**
    * Set to `true` when the user wants a fully working app (state, controls that
    * mutate data, create/import/edit/delete flows). Default `false` renders a
@@ -79,6 +88,18 @@ export interface MontageGenerateResult {
   hostedUrl?: string;
   resolution?: MontageGenerationResolution;
   diagnostics?: MontageGenerationDiagnostic[];
+}
+
+export interface AdapterConfigSummary {
+  provider: string;
+  configuredAt: string;
+  keys: string[];
+}
+
+export interface MontageAdapterMethods {
+  configure(provider: string, config: Record<string, string>): Promise<void>;
+  list(): Promise<AdapterConfigSummary[]>;
+  remove(provider: string): Promise<void>;
 }
 
 export type MontageGenerateStreamEvent =
@@ -133,6 +154,11 @@ export interface MontageStreamOptions {
   onEvent?: (event: MontageGenerateStreamEvent, rawChunk: string) => void;
 }
 
+export interface MontageStreamSurface {
+  applyEvent(event: MontageGenerateStreamEvent): Promise<void>;
+  cleanup(): void;
+}
+
 export interface AnthropicToolDefinition {
   name: string;
   description: string;
@@ -149,6 +175,7 @@ export interface OpenAIToolDefinition {
 }
 
 export interface MontageToolkit {
+  adapters: MontageAdapterMethods;
   execute(input: MontageGenerateInput): Promise<MontageGenerateResult>;
   stream(
     input: MontageGenerateInput,
@@ -177,7 +204,46 @@ export class MontageApiError extends Error {
 }
 
 const DEFAULT_API_URL = "https://api.usemontage.ai";
+const DEFAULT_DEV_API_URL = "http://localhost:8787";
 const STREAM_SLOT_PAINT_SETTLE_MS = 350;
+const GENERATED_REQUEST_ID_PREFIX = "mtg";
+
+function resolveApiUrl(config: MontageToolsConfig): string {
+  const environment = config.environment ?? "production";
+  if (environment !== "production" && environment !== "development") {
+    throw new Error(
+      'Invalid Montage environment. Expected "production" or "development".',
+    );
+  }
+
+  const apiUrl =
+    config.apiUrl ??
+    (environment === "development" ? DEFAULT_DEV_API_URL : DEFAULT_API_URL);
+
+  if (environment !== "development" && isLocalApiUrl(apiUrl)) {
+    throw new Error(
+      'Local Montage API URLs require environment: "development".',
+    );
+  }
+
+  return apiUrl;
+}
+
+function isLocalApiUrl(apiUrl: string): boolean {
+  try {
+    const hostname = new URL(apiUrl).hostname.toLowerCase();
+    return (
+      hostname === "localhost" ||
+      hostname.endsWith(".localhost") ||
+      hostname === "0.0.0.0" ||
+      hostname.startsWith("127.") ||
+      hostname === "::1" ||
+      hostname === "[::1]"
+    );
+  } catch {
+    return false;
+  }
+}
 
 const TOOL_DESCRIPTION = `Generate a rich, interactive HTML artifact — dashboards, charts, reports, tables, forms, pipelines, or any visual UI — from a natural-language render brief and structured data. Call this instead of returning markdown tables or plain-text lists whenever the user wants something visual.
 
@@ -188,6 +254,7 @@ const TOOL_DESCRIPTION = `Generate a rich, interactive HTML artifact — dashboa
 "strictData": Defaults to true. Montage fails closed when required fields or capabilities cannot be validated.
 "requiredFields" and "requiredCapabilities": Use these for must-not-omit data contracts. Required capabilities are dispatched through the capability bridge at render time.
 "interactive": Set to true ONLY when the user wants a fully working app — state, controls that mutate data, add/import/edit/delete flows, search/filter that actually filters, etc. Set to false (default) for briefs, reports, comparisons, summaries, dashboards-as-screenshots, and any read-only artifact. Charts and tooltips work in either mode; this flag is about whether the artifact has behavior, not whether it has hover effects.
+"zeroed": Set to true when mutable record collections should start empty instead of seeded/sample populated.
 "designSystem": Optional theme/branding override. Set brand colors, dark/light mode, typography.
 
 Before calling this tool, upgrade vague user requests into a render brief:
@@ -202,6 +269,23 @@ Before calling this tool, upgrade vague user requests into a render brief:
 Good prompt example: "Interactive fundraising pipeline for a startup CFO. Start with no investor rows. User can add investors, import a CSV with firm/partner/stage/target/probability/nextStep/owner fields through a real file picker, filter by stage/search, and export visible rows. Use Montage Default light SaaS styling. First screen should be the app workspace, not a report or landing page."
 
 Returns { html, id, creditsUsed } — "html" is the rendered artifact ready to display.`;
+
+function buildDefaultRequestId(): string {
+  const random =
+    typeof globalThis.crypto !== "undefined" && typeof globalThis.crypto.randomUUID === "function"
+      ? globalThis.crypto.randomUUID().replace(/-/g, "")
+      : Math.random().toString(36).slice(2, 14);
+  return `${GENERATED_REQUEST_ID_PREFIX}_${random.slice(0, 24)}`;
+}
+
+function resolveRequestId(requestId: string | undefined): string {
+  const explicit = requestId?.trim();
+  if (explicit) {
+    const sanitized = explicit.replace(/[^A-Za-z0-9_.-]+/g, "_").slice(0, 120);
+    if (sanitized.length > 0) return sanitized;
+  }
+  return buildDefaultRequestId();
+}
 
 const INPUT_SCHEMA: Record<string, unknown> = {
   type: "object",
@@ -252,6 +336,11 @@ const INPUT_SCHEMA: Record<string, unknown> = {
       type: "boolean",
       description:
         "True when the artifact should be a fully working app (state, handlers, add/import/edit/delete, search/filter that actually filters). False (default) produces a static brief/report/comparison/dashboard-as-screenshot. Defaults to false when omitted.",
+    },
+    zeroed: {
+      type: "boolean",
+      description:
+        "True when mutable record collections should start empty rather than seeded/sample populated.",
     },
   },
 };
@@ -306,10 +395,28 @@ function writeIframeDocument(iframe: HTMLIFrameElement, html: string): void {
   doc.close();
 }
 
+// Streaming entrance: choreographed fade-in for each slot as it arrives.
+//
+// CONTRACT WITH THE RENDERER:
+//   CSS `transform` on an SVG element fully REPLACES its `transform` attribute
+//   (they don't compose — see CSS Transforms Level 1). So any SVG <g> with a
+//   class targeted below MUST NOT carry a `transform=""` attribute; positioning
+//   transforms must live on an unclassed outer <g> wrapper. The atlas chart
+//   renderer enforces this (see chart/index.html `legend()` helper).
+//   The invariant is verified by atlas-chart-animation-contract.test.ts.
 const STREAM_TRANSITION_CSS = `
-[data-mtg-stream-slot]{opacity:0;transform:translateY(8px);transition:opacity .32s ease,transform .32s ease}
-[data-mtg-stream-slot][data-mtg-stream-filled]{opacity:1;transform:translateY(0)}
-@keyframes mtg-stream-reveal{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+[data-mtg-stream-slot]:not([data-mtg-stream-filled]){display:none}
+[data-mtg-stream-slot][data-mtg-stream-filled]{display:block;width:100%;max-width:100%;min-width:0;opacity:0;transform:translateY(8px);animation:mtg-stream-enter .34s cubic-bezier(.25,.46,.45,.94) both}
+[data-mtg-stream-slots]{display:block;width:100%;max-width:100%;min-width:0}
+[data-mtg-streaming] .mtg-report-grid-row{flex-direction:column!important;gap:0!important}
+[data-mtg-streaming] .mtg-report-grid-item,[data-mtg-streaming] .mtg-report-grid-item--full{flex:none!important;width:100%!important;max-width:100%!important}
+[data-mtg-streaming] .mtg-full-render-body{display:flex!important;flex-direction:column!important;grid-template-columns:none!important}
+[data-mtg-streaming] .mtg-full-render-rail{border-left:none!important;border-top:none!important}
+[data-mtg-streaming] .mtg-dashboard-grid{display:flex!important;flex-direction:column!important;grid-template-columns:none!important}
+[data-mtg-streaming] .mtg-dashboard-region{width:100%!important;max-width:100%!important}
+[data-mtg-streaming] .mtg-stack[data-direction="row"]{flex-direction:column!important}
+[data-mtg-streaming] .mtg-stack[data-direction="row"]>*{flex:1 1 auto!important}
+[data-mtg-streaming] .mtg-report-section,[data-mtg-streaming] .mtg-report-band,[data-mtg-streaming] .mtg-aot-inline-section,[data-mtg-streaming] .mtg-report-chart-wrap,[data-mtg-streaming] .mtg-report-table-shell{width:100%!important;max-width:100%!important;min-width:0!important}
 @keyframes mtg-stream-enter{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 @keyframes mtg-stream-number{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:scale(1)}}
 @keyframes mtg-stream-bar{from{transform:scaleY(0)}to{transform:scaleY(1)}}
@@ -337,7 +444,7 @@ const STREAM_TRANSITION_CSS = `
 .mtg-stream-enter .mtg-chart-legend{animation:mtg-stream-enter .28s cubic-bezier(.25,.46,.45,.94) .2s both}
 .mtg-stream-enter .mtg-report-stat-change{animation:mtg-stream-number .28s cubic-bezier(.25,.46,.45,.94) .22s both}
 .mtg-stream-enter .mtg-report-stat-spark{animation:mtg-stream-enter .4s cubic-bezier(.25,.46,.45,.94) .18s both}
-@media(prefers-reduced-motion:reduce){.mtg-stream-enter,.mtg-stream-enter *{animation:none!important}}
+@media(prefers-reduced-motion:reduce){[data-mtg-stream-slot][data-mtg-stream-filled]{animation:none!important;opacity:1;transform:none}.mtg-stream-enter,.mtg-stream-enter *{animation:none!important}}
 `;
 
 function injectStreamTransitionStyle(doc: Document): void {
@@ -351,11 +458,17 @@ function injectStreamTransitionStyle(doc: Document): void {
 function mountStreamHtml(
   target: HTMLElement | HTMLIFrameElement,
   html: string,
+  isDone = false,
 ): () => void {
   if (isIframeTarget(target)) {
     writeIframeDocument(target, html);
     const iframeDoc = target.contentDocument;
-    if (iframeDoc) injectStreamTransitionStyle(iframeDoc);
+    if (iframeDoc) {
+      injectStreamTransitionStyle(iframeDoc);
+      if (!isDone && iframeDoc.body) {
+        iframeDoc.body.setAttribute("data-mtg-streaming", "true");
+      }
+    }
     return () => {
       target.srcdoc = "";
       const doc = target.contentDocument;
@@ -369,6 +482,11 @@ function mountStreamHtml(
 
   const fragment = htmlToFragment(target.ownerDocument, html);
   target.replaceChildren(fragment);
+  if (!isDone) {
+    target.setAttribute("data-mtg-streaming", "true");
+  } else {
+    target.removeAttribute("data-mtg-streaming");
+  }
   injectStreamTransitionStyle(target.ownerDocument);
   return () => target.replaceChildren();
 }
@@ -431,7 +549,10 @@ function patchStreamSlot(
     }
   }
 
-  const existingIframe = slotElement.querySelector<HTMLIFrameElement>("iframe[srcdoc]");
+  const allIframes = Array.from(slotElement.querySelectorAll<HTMLIFrameElement>("iframe[srcdoc]"));
+  const existingIframe = allIframes.find((f) => f.hasAttribute("data-mtg-active"))
+    ?? allIframes[allIframes.length - 1]
+    ?? null;
   const fragment = htmlToFragment(ownerDocument, html);
   const incomingIframe = fragment.querySelector<HTMLIFrameElement>("iframe[srcdoc]");
 
@@ -439,16 +560,44 @@ function patchStreamSlot(
     const nextSrcdoc = incomingIframe.getAttribute("srcdoc") ?? "";
     const prevLen = (existingIframe as HTMLIFrameElement & { _mtgSrcdocLen?: number })._mtgSrcdocLen ?? 0;
     const isFinal = nextSrcdoc.length > 0 && nextSrcdoc.length - prevLen < 200;
-    if (!isFinal && nextSrcdoc.length - prevLen < 3000 && prevLen > 0) {
+    if (!isFinal && nextSrcdoc.length - prevLen < 400 && prevLen > 0) {
       return;
     }
     (existingIframe as HTMLIFrameElement & { _mtgSrcdocLen?: number })._mtgSrcdocLen = nextSrcdoc.length;
-    existingIframe.style.opacity = "0.6";
-    existingIframe.srcdoc = nextSrcdoc;
-    existingIframe.addEventListener("load", () => {
-      existingIframe.style.transition = "opacity 0.3s ease";
-      existingIframe.style.opacity = "1";
-    }, { once: true });
+    const doc = existingIframe.contentDocument;
+    if (doc && doc.body) {
+      const parserCtor = ownerDocument.defaultView?.DOMParser ?? globalThis.DOMParser;
+      const incoming = new parserCtor().parseFromString(nextSrcdoc, "text/html");
+      for (const style of Array.from(incoming.head.querySelectorAll("style"))) {
+        const id = style.id || style.getAttribute("data-id");
+        const existing = id ? doc.head.querySelector(`style#${id}`) : null;
+        if (existing) {
+          existing.textContent = style.textContent;
+        } else {
+          const clone = doc.importNode(style, true);
+          if (!id) clone.setAttribute("data-id", `mtg-injected-${doc.head.querySelectorAll("style").length}`);
+          doc.head.appendChild(clone);
+        }
+      }
+      const incomingContent = incoming.getElementById("mtg-stream-content");
+      const existingContent = doc.getElementById("mtg-stream-content");
+      if (incomingContent && existingContent) {
+        existingContent.innerHTML = incomingContent.innerHTML;
+      } else {
+        const spinner = doc.querySelector(".mtg-stream-spinner");
+        doc.body.innerHTML = incoming.body.innerHTML;
+        if (spinner && !doc.querySelector(".mtg-stream-spinner")) {
+          doc.body.appendChild(spinner);
+        }
+      }
+      if (!doc.querySelector(".mtg-stream-spinner")) {
+        const spinner = doc.createElement("div");
+        spinner.className = "mtg-stream-spinner";
+        doc.body.appendChild(spinner);
+      }
+    } else {
+      existingIframe.srcdoc = nextSrcdoc;
+    }
   } else {
     slotElement.replaceChildren(fragment);
     const newIframe = slotElement.querySelector<HTMLIFrameElement>("iframe[srcdoc]");
@@ -464,17 +613,6 @@ function patchStreamSlot(
 
   const alreadyFilled = slotElement.hasAttribute("data-mtg-stream-filled");
 
-  if (isNew) {
-    const rAF = ownerDocument.defaultView?.requestAnimationFrame;
-    if (rAF) {
-      rAF(() => slotElement!.setAttribute("data-mtg-stream-filled", "true"));
-    } else {
-      slotElement.setAttribute("data-mtg-stream-filled", "true");
-    }
-  } else if (!alreadyFilled) {
-    slotElement.setAttribute("data-mtg-stream-filled", "true");
-  }
-
   if (!alreadyFilled) {
     let delay = 0;
     for (const child of Array.from(slotElement.children)) {
@@ -485,8 +623,8 @@ function patchStreamSlot(
         delay += 60;
       }
     }
+    slotElement.setAttribute("data-mtg-stream-filled", "true");
   }
-
 }
 
 function createGenerateBody(
@@ -503,7 +641,9 @@ function createGenerateBody(
     prompt: input.prompt,
     dataInfo: input.dataInfo,
     interactive: input.interactive ?? false,
+    requestId: resolveRequestId(input.requestId),
   };
+  if (input.zeroed !== undefined) body.zeroed = input.zeroed;
   if (input.title) body.title = input.title;
   if (input.data !== undefined) body.data = input.data;
   if (input.hosted !== undefined) body.hosted = input.hosted;
@@ -525,19 +665,16 @@ function createGenerateBody(
   if (input.artifactId) {
     body.artifactId = input.artifactId;
   }
-  if (input.requestId) {
-    body.requestId = input.requestId;
-  }
   if (input.includeHtml) {
     body.includeHtml = true;
   }
   return body;
 }
 
-async function readSseResponse(
+export async function readMontageSseResponse<TEvent = MontageGenerateStreamEvent>(
   response: Response,
   onEvent: (
-    event: MontageGenerateStreamEvent,
+    event: TEvent,
     rawChunk: string,
   ) => void | Promise<void>,
 ): Promise<void> {
@@ -556,9 +693,9 @@ async function readSseResponse(
   const flushBlock = async (block: string, rawChunk: string) => {
     const line = block.split("\n").find((entry) => entry.startsWith("data: "));
     if (!line) return;
-    let event: MontageGenerateStreamEvent;
+    let event: TEvent;
     try {
-      event = JSON.parse(line.slice(6)) as MontageGenerateStreamEvent;
+      event = JSON.parse(line.slice(6)) as TEvent;
     } catch {
       // Ignore malformed/partial SSE payloads.
       return;
@@ -614,6 +751,57 @@ async function waitForStreamSlotPaint(
   });
 }
 
+export function createMontageStreamSurface(
+  target: HTMLElement | HTMLIFrameElement,
+): MontageStreamSurface {
+  let cleanupMount: () => void = () => {};
+  let hasPendingSlotPaint = false;
+
+  const cleanup = () => {
+    cleanupMount();
+    cleanupMount = () => {};
+    hasPendingSlotPaint = false;
+  };
+
+  return {
+    async applyEvent(event: MontageGenerateStreamEvent): Promise<void> {
+      if (event.type === "shell") {
+        cleanupMount();
+        cleanupMount = mountStreamHtml(target, event.html);
+        hasPendingSlotPaint = false;
+        return;
+      }
+
+      if (event.type === "slot") {
+        patchStreamSlot(
+          target,
+          event.slot,
+          event.html,
+          (event as Record<string, unknown>).styles as string | undefined,
+          (event as Record<string, unknown>).stylesheets as string[] | undefined,
+        );
+        hasPendingSlotPaint = true;
+        return;
+      }
+
+      if (event.type === "done") {
+        if (hasPendingSlotPaint) {
+          await waitForStreamSlotPaint(target);
+          hasPendingSlotPaint = false;
+        }
+        cleanupMount();
+        cleanupMount = mountStreamHtml(target, event.html, true);
+        return;
+      }
+
+      if (event.type === "error") {
+        cleanup();
+      }
+    },
+    cleanup,
+  };
+}
+
 async function readApiError(response: Response): Promise<MontageApiError> {
   let errorBody: {
     code?: string;
@@ -635,10 +823,63 @@ async function readApiError(response: Response): Promise<MontageApiError> {
   );
 }
 
+async function requestAdapterConfig(
+  apiUrl: string,
+  apiKey: string,
+  provider: string,
+  config: Record<string, string>,
+): Promise<void> {
+  const response = await fetch(`${apiUrl}/v1/adapters/${encodeURIComponent(provider)}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify(config),
+  });
+  if (!response.ok) throw await readApiError(response);
+}
+
+async function requestAdapterList(
+  apiUrl: string,
+  apiKey: string,
+): Promise<AdapterConfigSummary[]> {
+  const response = await fetch(`${apiUrl}/v1/adapters`, {
+    headers: { Authorization: `Bearer ${apiKey}` },
+  });
+  if (!response.ok) throw await readApiError(response);
+  const body = (await response.json()) as { data?: AdapterConfigSummary[] };
+  return body.data ?? [];
+}
+
+async function requestAdapterRemove(
+  apiUrl: string,
+  apiKey: string,
+  provider: string,
+): Promise<void> {
+  const response = await fetch(`${apiUrl}/v1/adapters/${encodeURIComponent(provider)}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${apiKey}` },
+  });
+  if (!response.ok) throw await readApiError(response);
+}
+
 export function createMontageTools(config: MontageToolsConfig): MontageToolkit {
-  const apiUrl = config.apiUrl ?? DEFAULT_API_URL;
+  const apiUrl = resolveApiUrl(config);
 
   return {
+    adapters: {
+      configure(provider, adapterConfig) {
+        return requestAdapterConfig(apiUrl, config.apiKey, provider, adapterConfig);
+      },
+      list() {
+        return requestAdapterList(apiUrl, config.apiKey);
+      },
+      remove(provider) {
+        return requestAdapterRemove(apiUrl, config.apiKey, provider);
+      },
+    },
+
     async execute(input: MontageGenerateInput): Promise<MontageGenerateResult> {
       const body = createGenerateBody(input, config, {});
 
@@ -785,7 +1026,7 @@ export function createMontageTools(config: MontageToolsConfig): MontageToolkit {
         }
 
         try {
-          await readSseResponse(response, async (event, rawChunk) => {
+          await readMontageSseResponse(response, async (event, rawChunk) => {
             if (event.type === "status") {
               options.onStatus?.(event.text);
             } else if (event.type === "shell") {
@@ -808,7 +1049,7 @@ export function createMontageTools(config: MontageToolsConfig): MontageToolkit {
                 ));
               }
               cleanupMount();
-              cleanupMount = mountStreamHtml(options.target, event.html);
+              cleanupMount = mountStreamHtml(options.target, event.html, true);
               const derivedParts = event.parts ?? extractHtmlBlockPayload(event.html);
               finalResult = {
                 html: event.html,
@@ -891,6 +1132,13 @@ export function createMontageTools(config: MontageToolsConfig): MontageToolkit {
           signal: options.signal,
         });
       } catch (error) {
+        if (options.signal?.aborted) {
+          throw new MontageApiError(
+            "aborted",
+            0,
+            "Montage streaming request aborted.",
+          );
+        }
         const message =
           error instanceof Error ? error.message : String(error);
         throw new MontageApiError(
@@ -928,7 +1176,7 @@ export function createMontageTools(config: MontageToolsConfig): MontageToolkit {
           "Montage API streaming response did not include a body.",
         );
       }
-      await readSseResponse(response, onEvent);
+      await readMontageSseResponse(response, onEvent);
     },
 
     async executeFragment(

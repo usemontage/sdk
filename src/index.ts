@@ -1,18 +1,24 @@
 export { createMontageTools } from "./tools";
 export * as integrations from "./integrations";
 export type {
+  MontageApiEnvironment,
   MontageToolsConfig,
   MontageToolkit,
   MontageGenerateInput,
   MontageGenerateResult,
   MontageGenerateStreamEvent,
   MontageGenerationDiagnostic,
+  MontageStreamSurface,
+  AdapterConfigSummary,
+  MontageAdapterMethods,
   MontageStreamOptions,
   MontageStreamResult,
   MontageFragmentResult,
   MontageGenerateFragmentResult,
 } from "./tools";
 export { MontageApiError } from "./tools";
+export { createMontageStreamSurface } from "./tools";
+export { readMontageSseResponse } from "./tools";
 export { MontageError } from "./errors";
 export { createMontageAdapter } from "./agent-adapter";
 export { bindMontageCapabilityBridge } from "./capability-bridge";

@@ -1,4 +1,5 @@
-node_modules
-dist
-.turbo
-*.tsbuildinfo
+dist/
+node_modules/
+coverage/
+*.tgz
+

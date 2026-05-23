@@ -10,7 +10,8 @@ service. The package contains:
 
 - A typed `createMontageTools()` factory that calls `POST /v1/generate`
 - Managed server-rendered streaming via `montage.stream()`
-- Framework adapters for Mastra, LangChain, and the Vercel AI SDK
+- Framework adapters for Mastra, LangChain, Vercel AI SDK, Agno,
+  Cloudflare Agents, and Strands
 - A React `<HtmlBlock>` component that mounts self-contained bundled HTML and
   executes the artifact's inline scripts
 - Agent-host primitives — `createMontageAdapter()` and
@@ -38,8 +39,9 @@ Get an API key from [usemontage.ai](https://usemontage.ai), then:
 > with `<HtmlBlock>`.
 >
 > By default the SDK calls the production API at `https://api.usemontage.ai`.
-> Pass `apiUrl` only when Montage support directs you to use a different
-> endpoint.
+> For local development, opt in with `environment: "development"` to target
+> `http://localhost:8787`. Local `apiUrl` values are rejected unless this
+> development gate is explicit.
 
 ```ts
 import Anthropic from "@anthropic-ai/sdk";
@@ -148,6 +150,15 @@ const result = await montage.execute({
 });
 ```
 
+For local API development:
+
+```ts
+const montage = createMontageTools({
+  apiKey: process.env.MONTAGE_API_KEY!,
+  environment: "development",
+});
+```
+
 You can also bake defaults into the toolkit:
 
 ```ts
@@ -179,6 +190,15 @@ const langchainTool = integrations.langchain(toolkit, z);
 
 // Vercel AI SDK: { description, parameters, execute }
 const aiTool = integrations.vercelAi(toolkit, z);
+
+// Agno: JSON schema tool with execute()
+const agnoTool = integrations.agno(toolkit);
+
+// Cloudflare Agents: JSON schema tool with execute()
+const cloudflareTool = integrations.cloudflareAgent(toolkit);
+
+// Strands Agents: JSON schema tool with execute()
+const strandsTool = integrations.strands(toolkit);
 
 // Generic JSON-schema definition
 const rawTool = integrations.raw(toolkit);
