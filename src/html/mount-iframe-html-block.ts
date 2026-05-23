@@ -28,12 +28,14 @@ export interface MountedIframeHtmlBlockOptions<
   host: HTMLElement;
   /** Full HTML document string. */
   html: string;
-  /** Sandbox attributes. Defaults to `allow-scripts allow-same-origin allow-forms allow-popups`. */
+  /** Sandbox attributes. Defaults to `allow-scripts allow-same-origin allow-forms allow-popups allow-downloads`. */
   sandbox?: string;
   /** Iframe title for a11y. Defaults to "Montage rendered artifact". */
   title?: string;
   /** Minimum height in px before content measures. Defaults to 400. */
   minHeight?: number;
+  /** Resize the iframe to document content height. Defaults to true. */
+  autoResize?: boolean;
   /** Called whenever the iframe's measured content height changes. */
   onResize?: (heightPx: number) => void;
   /** Capability adapter bridged into the iframe as `MontageAOT.invoke`. */
@@ -49,7 +51,7 @@ export interface MountedIframeHtmlBlockOptions<
 }
 
 const DEFAULT_SANDBOX =
-  "allow-scripts allow-same-origin allow-forms allow-popups";
+  "allow-scripts allow-same-origin allow-forms allow-popups allow-downloads";
 
 export function mountIframeHtmlBlock<
   TAgent extends MontageAgentDescriptor = MontageAgentDescriptor,
@@ -62,6 +64,7 @@ export function mountIframeHtmlBlock<
     sandbox = DEFAULT_SANDBOX,
     title = "Montage rendered artifact",
     minHeight = 400,
+    autoResize = true,
     onResize,
   } = input;
 
@@ -105,6 +108,7 @@ export function mountIframeHtmlBlock<
       if (doc.body && !doc.body.classList.contains(FRAGMENT_ROOT_CLASS)) {
         doc.body.classList.add(FRAGMENT_ROOT_CLASS);
       }
+      if (!autoResize) return;
 
       const measure = () => {
         let contentHeight = Math.max(

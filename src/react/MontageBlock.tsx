@@ -46,6 +46,7 @@ export interface MontageBlockProps<
   sandbox?: string;
   title?: string;
   minHeight?: number;
+  autoResize?: boolean;
   onResize?: (heightPx: number) => void;
 
   adapter?: MontageAdapter<TAgent>;
@@ -178,6 +179,7 @@ export function MontageBlock<
         ...(props.sandbox ? { sandbox: props.sandbox } : {}),
         ...(props.title ? { title: props.title } : {}),
         ...(typeof props.minHeight === "number" ? { minHeight: props.minHeight } : {}),
+        ...(typeof props.autoResize === "boolean" ? { autoResize: props.autoResize } : {}),
         ...(props.onResize ? { onResize: props.onResize } : {}),
         adapter: props.adapter,
         context: props.context,

@@ -10,7 +10,8 @@ service. The package contains:
 
 - A typed `createMontageTools()` factory that calls `POST /v1/generate`
 - Managed server-rendered streaming via `montage.stream()`
-- Framework adapters for Mastra, LangChain, and the Vercel AI SDK
+- Framework adapters for Mastra, LangChain, Vercel AI SDK, Agno,
+  Cloudflare Agents, and Strands
 - A React `<HtmlBlock>` component that mounts self-contained bundled HTML and
   executes the artifact's inline scripts
 - Agent-host primitives — `createMontageAdapter()` and
@@ -179,6 +180,15 @@ const langchainTool = integrations.langchain(toolkit, z);
 
 // Vercel AI SDK: { description, parameters, execute }
 const aiTool = integrations.vercelAi(toolkit, z);
+
+// Agno: JSON schema tool with execute()
+const agnoTool = integrations.agno(toolkit);
+
+// Cloudflare Agents: JSON schema tool with execute()
+const cloudflareTool = integrations.cloudflareAgent(toolkit);
+
+// Strands Agents: JSON schema tool with execute()
+const strandsTool = integrations.strands(toolkit);
 
 // Generic JSON-schema definition
 const rawTool = integrations.raw(toolkit);

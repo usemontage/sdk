@@ -112,4 +112,20 @@ describe("iframe-bridge — parent side", () => {
     cleanup();
     host.remove();
   });
+
+  it("allows generated artifacts to trigger browser downloads by default", () => {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+
+    const cleanup = mountIframeHtmlBlock({
+      host,
+      html: "<!DOCTYPE html><html><body><main>Export</main></body></html>",
+    });
+
+    const iframe = host.querySelector("iframe");
+    expect(iframe?.getAttribute("sandbox")).toContain("allow-downloads");
+
+    cleanup();
+    host.remove();
+  });
 });

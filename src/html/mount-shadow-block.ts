@@ -181,6 +181,6 @@ function installShadowTooltips(root: ShadowRoot, container: HTMLElement): void {
 function adaptCssForShadowDom(css: string): string {
   return css
     .replace(/:root/g, ":host")
-    .replace(/(?:html\s*,\s*body|body\s*,\s*html)\s*\{[^}]*\}/g, "")
-    .replace(/(?<![.\-\w])body\s*\{[^}]*\}/g, "");
+    .replace(/(?:html\s*,\s*body|body\s*,\s*html)\s*\{/g, ":host{")
+    .replace(/(?<![.\-\w])body\s*\{/g, ":host{");
 }

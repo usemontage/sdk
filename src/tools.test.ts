@@ -37,6 +37,9 @@ describe("createMontageTools", () => {
 
   it("returns an object with execute, anthropic, and openai methods", () => {
     const tools = createMontageTools({ apiKey: "sk_test" });
+    expect(typeof tools.adapters.configure).toBe("function");
+    expect(typeof tools.adapters.list).toBe("function");
+    expect(typeof tools.adapters.remove).toBe("function");
     expect(typeof tools.execute).toBe("function");
     expect(typeof tools.anthropic).toBe("function");
     expect(typeof tools.openai).toBe("function");
@@ -120,6 +123,39 @@ describe("createMontageTools", () => {
     });
   });
 
+  describe("adapters", () => {
+    it("configures, lists, and removes adapter credentials", async () => {
+      mockFetch
+        .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ success: true }) })
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            success: true,
+            data: [{ provider: "supabase", configuredAt: "2026-05-20T00:00:00Z", keys: ["SUPABASE_URL"] }],
+          }),
+        })
+        .mockResolvedValueOnce({ ok: true, status: 204, json: async () => ({}) });
+
+      const tools = createMontageTools({ apiKey: "sk_test", apiUrl: "https://api.example.test" });
+
+      await tools.adapters.configure("supabase", {
+        SUPABASE_URL: "https://acme.supabase.co",
+        SUPABASE_ANON_KEY: "anon",
+      });
+      const adapters = await tools.adapters.list();
+      await tools.adapters.remove("supabase");
+
+      expect(adapters).toEqual([
+        { provider: "supabase", configuredAt: "2026-05-20T00:00:00Z", keys: ["SUPABASE_URL"] },
+      ]);
+      expect(mockFetch.mock.calls[0][0]).toBe("https://api.example.test/v1/adapters/supabase");
+      expect(mockFetch.mock.calls[0][1].method).toBe("PUT");
+      expect(mockFetch.mock.calls[1][0]).toBe("https://api.example.test/v1/adapters");
+      expect(mockFetch.mock.calls[2][1].method).toBe("DELETE");
+    });
+  });
+
   describe("openai", () => {
     it("returns an array with one tool definition", () => {
       const tools = createMontageTools({ apiKey: "sk_test" });
@@ -195,6 +231,43 @@ describe("createMontageTools", () => {
       const body = JSON.parse(opts.body);
       expect(body.prompt).toBe("my prompt");
       expect(body.dataInfo).toBe('{"key":"value"}');
+    });
+
+    it("adds a generated requestId when one is not provided", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ id: "gen_1", html: "<p/>", creditsUsed: 1 }),
+      });
+
+      const tools = createMontageTools({ apiKey: "sk_test" });
+      await tools.execute({
+        prompt: "my prompt",
+        dataInfo: "{}",
+      });
+
+      const [, opts] = mockFetch.mock.calls[0];
+      const body = JSON.parse(opts.body);
+      expect(typeof body.requestId).toBe("string");
+      expect(body.requestId.length).toBeGreaterThan(5);
+      expect(body.requestId.startsWith("mtg_")).toBe(true);
+    });
+
+    it("sanitizes caller-provided requestId values", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ id: "gen_1", html: "<p/>", creditsUsed: 1 }),
+      });
+
+      const tools = createMontageTools({ apiKey: "sk_test" });
+      await tools.execute({
+        prompt: "sanitize id",
+        dataInfo: "{}",
+        requestId: "  a bad/id with spaces  ",
+      });
+
+      const [, opts] = mockFetch.mock.calls[0];
+      const body = JSON.parse(opts.body);
+      expect(body.requestId).toBe("a_bad_id_with_spaces");
     });
 
     it("forwards an optional title in the generate body", async () => {
@@ -652,6 +725,26 @@ describe("createMontageTools", () => {
       });
     });
 
+    it("adds a generated requestId to stream requests by default", async () => {
+      mockFetch.mockResolvedValueOnce(createSseResponse([
+        { type: "done", html: "<!doctype html><html><body>Final</body></html>", id: "gen_stream" },
+      ]));
+
+      const dom = new JSDOM("<div id=\"target\"></div>", { url: "http://localhost" });
+      const target = dom.window.document.getElementById("target") as HTMLElement;
+      const tools = createMontageTools({ apiKey: "sk_test" });
+
+      await tools.stream(
+        { prompt: "stream users", dataInfo: "{}" },
+        { target },
+      );
+
+      const [, opts] = mockFetch.mock.calls[0];
+      const body = JSON.parse(opts.body);
+      expect(typeof body.requestId).toBe("string");
+      expect(body.requestId.startsWith("mtg_")).toBe(true);
+    });
+
     it("mounts shell, applies slots, and replaces with final HTML", async () => {
       mockFetch.mockResolvedValueOnce(createSseResponse([
         { type: "status", text: "Generating..." },
@@ -854,6 +947,27 @@ describe("createMontageTools", () => {
         message: "Generation failed",
       }));
       expect(target.innerHTML).toBe("");
+    });
+  });
+
+  describe("executeStreaming", () => {
+    it("throws an aborted error when the request signal is already aborted", async () => {
+      const controller = new AbortController();
+      controller.abort();
+      mockFetch.mockRejectedValueOnce(new DOMException("The operation was aborted.", "AbortError"));
+
+      const tools = createMontageTools({ apiKey: "sk_test" });
+
+      await expect(
+        tools.executeStreaming(
+          { prompt: "stream", dataInfo: "{}" },
+          () => {},
+          { signal: controller.signal },
+        ),
+      ).rejects.toMatchObject({
+        code: "aborted",
+        status: 0,
+      });
     });
   });
 });
