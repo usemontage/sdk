@@ -1,12 +1,16 @@
 name: Publish to npm
 
 on:
-  push:
-    tags:
-      - "v*"
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type 'publish' to publish @montageai/sdk."
+        required: true
+        type: string
 
 jobs:
   publish:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.confirm == 'publish' }}
     runs-on: ubuntu-latest
     environment: npm-publish
     permissions:
