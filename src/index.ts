@@ -1,6 +1,7 @@
 export { createMontageTools } from "./tools";
 export * as integrations from "./integrations";
 export type {
+  MontageApiEnvironment,
   MontageToolsConfig,
   MontageToolkit,
   MontageGenerateInput,

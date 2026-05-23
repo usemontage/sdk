@@ -19,8 +19,15 @@ export type {
   MontageGenerateFragmentResult,
 } from "./public-types";
 
+export type MontageApiEnvironment = "production" | "development";
+
 export interface MontageToolsConfig {
   apiKey: string;
+  /**
+   * Defaults to `production`. Set to `development` to target the local
+   * development API without passing an explicit `apiUrl`.
+   */
+  environment?: MontageApiEnvironment;
   apiUrl?: string;
   defaults?: {
     designSystem?: MontageDesignSystemConfig;
@@ -197,8 +204,46 @@ export class MontageApiError extends Error {
 }
 
 const DEFAULT_API_URL = "https://api.usemontage.ai";
+const DEFAULT_DEV_API_URL = "http://localhost:8787";
 const STREAM_SLOT_PAINT_SETTLE_MS = 350;
 const GENERATED_REQUEST_ID_PREFIX = "mtg";
+
+function resolveApiUrl(config: MontageToolsConfig): string {
+  const environment = config.environment ?? "production";
+  if (environment !== "production" && environment !== "development") {
+    throw new Error(
+      'Invalid Montage environment. Expected "production" or "development".',
+    );
+  }
+
+  const apiUrl =
+    config.apiUrl ??
+    (environment === "development" ? DEFAULT_DEV_API_URL : DEFAULT_API_URL);
+
+  if (environment !== "development" && isLocalApiUrl(apiUrl)) {
+    throw new Error(
+      'Local Montage API URLs require environment: "development".',
+    );
+  }
+
+  return apiUrl;
+}
+
+function isLocalApiUrl(apiUrl: string): boolean {
+  try {
+    const hostname = new URL(apiUrl).hostname.toLowerCase();
+    return (
+      hostname === "localhost" ||
+      hostname.endsWith(".localhost") ||
+      hostname === "0.0.0.0" ||
+      hostname.startsWith("127.") ||
+      hostname === "::1" ||
+      hostname === "[::1]"
+    );
+  } catch {
+    return false;
+  }
+}
 
 const TOOL_DESCRIPTION = `Generate a rich, interactive HTML artifact — dashboards, charts, reports, tables, forms, pipelines, or any visual UI — from a natural-language render brief and structured data. Call this instead of returning markdown tables or plain-text lists whenever the user wants something visual.
 
@@ -820,7 +865,7 @@ async function requestAdapterRemove(
 }
 
 export function createMontageTools(config: MontageToolsConfig): MontageToolkit {
-  const apiUrl = config.apiUrl ?? DEFAULT_API_URL;
+  const apiUrl = resolveApiUrl(config);
 
   return {
     adapters: {
