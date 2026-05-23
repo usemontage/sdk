@@ -181,7 +181,7 @@ const STREAM_SLOT_PAINT_SETTLE_MS = 350;
 
 const TOOL_DESCRIPTION = `Generate a rich, interactive HTML artifact — dashboards, charts, reports, tables, forms, pipelines, or any visual UI — from a natural-language render brief and structured data. Call this instead of returning markdown tables or plain-text lists whenever the user wants something visual.
 
-"prompt": A product-level render brief. Include the user goal, audience, workflow, entities, required interactions, constraints, and anti-goals. Do not emit internal source formats, raw HTML, or a low-level layout blueprint.
+"prompt": A product-level render brief. Include the user goal, audience, workflow, entities, required interactions, constraints, and anti-goals. Do not emit implementation-only source formats, raw HTML, or a low-level layout blueprint.
 "dataInfo": The actual data contract/data as a JSON string. Include real values when available, or explicit empty arrays/schemas/capabilities when the artifact starts empty. For import/upload workflows, include expected file types and row fields.
 "data": Optional pre-fetched data for static accuracy or initial render. Use adapter capabilities for data that must stay live after the artifact is shipped or hosted.
 "hosted": Set to true when the final artifact should be persisted and returned with a stable hosted URL.
@@ -210,7 +210,7 @@ const INPUT_SCHEMA: Record<string, unknown> = {
     prompt: {
       type: "string",
       description:
-        "Product-level render brief: goal, audience, workflow, entities, required interactions, constraints, and anti-goals. Do not emit internal source formats, raw HTML, or a low-level layout blueprint.",
+        "Product-level render brief: goal, audience, workflow, entities, required interactions, constraints, and anti-goals. Do not emit implementation-only source formats, raw HTML, or a low-level layout blueprint.",
     },
     dataInfo: {
       type: "string",
