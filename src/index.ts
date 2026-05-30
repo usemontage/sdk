@@ -7,7 +7,70 @@ export type {
   MontageGenerateResult,
   MontageGenerateStreamEvent,
   MontageGenerationDiagnostic,
+  MontageArtifactCacheMode,
+  MontageArtifactCapabilityInput,
+  MontageArtifactConstraints,
+  MontageArtifactContext,
+  MontageArtifactDetail,
+  MontageArtifactListOptions,
+  MontageArtifactListResult,
+  MontageArtifactMethods,
+  MontageArtifactPatchMode,
+  MontageArtifactTemplateDetail,
+  MontageArtifactTemplateListOptions,
+  MontageArtifactTemplateListResult,
+  MontageArtifactTemplateMethods,
+  MontageArtifactTemplateMutationResult,
+  MontageArtifactTemplateSummary,
+  MontageArtifactTemplateVisibility,
+  MontageArtifactRevisionDetail,
+  MontageArtifactRevisionListOptions,
+  MontageArtifactRevisionListResult,
+  MontageArtifactRevisionSummary,
+  MontageArtifactSummary,
+  MontageCreateArtifactInput,
+  MontageCreateArtifactResult,
+  MontageCreateArtifactTemplateInput,
+  MontageCreateDeploymentInput,
+  MontageCreateOrgInput,
+  MontageDeploymentAuthPolicy,
+  MontageDeploymentAgentPolicy,
+  MontageDeploymentAgentPolicyMode,
+  MontageDeploymentAgentActionEvent,
+  MontageDeploymentAgentActionUsage,
+  MontageDeploymentAgentActionUsageOptions,
+  MontageDeploymentCachePolicy,
+  MontageDeploymentCacheScope,
+  MontageDeploymentListOptions,
+  MontageDeploymentListResult,
+  MontageDeploymentMethods,
+  MontageDeploymentMode,
+  MontageDeploymentProofPolicy,
+  MontageDeploymentProofPolicyMode,
+  MontageDeploymentStatus,
+  MontageDeploymentSummary,
+  MontageForkArtifactTemplateInput,
+  MontageForkArtifactTemplateResult,
+  MontagePatchArtifactInput,
+  MontagePromoteDeploymentInput,
+  MontageOrgDetail,
+  MontageOrgKind,
+  MontageOrgListOptions,
+  MontageOrgListResult,
+  MontageOrgMemberListOptions,
+  MontageOrgMemberListResult,
+  MontageOrgMemberMutationResult,
+  MontageOrgMemberSummary,
+  MontageOrgMethods,
+  MontageOrgMutationResult,
+  MontageOrgRole,
+  MontageOrgSummary,
+  MontageUpdateDeploymentInput,
+  MontageUpsertOrgMemberInput,
+  MontageStreamCapabilityAlias,
+  MontageStreamCapabilityAliasContext,
   MontageStreamSurface,
+  MontageStreamSurfaceOptions,
   AdapterConfigSummary,
   MontageAdapterMethods,
   MontageStreamOptions,
@@ -17,9 +80,16 @@ export type {
 } from "./tools";
 export { MontageApiError } from "./tools";
 export { createMontageStreamSurface } from "./tools";
+export { normalizeMontageStreamEvent } from "./tools";
 export { readMontageSseResponse } from "./tools";
 export { MontageError } from "./errors";
 export { createMontageAdapter } from "./agent-adapter";
+export {
+  dispatchMontageAgentAction,
+  installMontageAgentActionHandler,
+  isMontageAgentActionRequest,
+  MONTAGE_AGENT_ACTION_EVENT,
+} from "./agent-actions";
 export { bindMontageCapabilityBridge } from "./capability-bridge";
 export {
   installCapabilityBridge,
@@ -45,6 +115,15 @@ export type {
   MontageAgentDescriptor,
 } from "./agent-adapter";
 export type {
+  MontageAgentActionEvent,
+  MontageAgentActionEventDetail,
+  MontageAgentActionHandler,
+  MontageAgentActionMode,
+  MontageAgentActionName,
+  MontageAgentActionRequest,
+  MontageAgentActionResult,
+} from "./agent-actions";
+export type {
   MontageAdapterGenerateRequest,
   MontageAdapterInvokeRequest,
   MontageAdapterTool,
@@ -52,6 +131,8 @@ export type {
 } from "./types";
 export type {
   MontageCapabilityBridgeErrorContext,
+  MontageCapabilityBridgeEvent,
+  MontageCapabilityBridgeEventPhase,
   MontageCapabilityBridgeOptions,
 } from "./capability-bridge";
 export type {

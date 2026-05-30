@@ -51,7 +51,7 @@ export interface MontageCapabilityInvokeRequest {
   name: string;
   source?: string;
   effect: MontageCapabilityEffect;
-  args?: unknown[];
+  args?: unknown;
   context?: unknown;
 }
 

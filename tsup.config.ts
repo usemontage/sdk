@@ -6,6 +6,7 @@ export default defineConfig({
     tools: "src/tools.ts",
     integrations: "src/integrations.ts",
     "agent-adapter": "src/agent-adapter.ts",
+    "agent-actions": "src/agent-actions.ts",
     "capability-bridge": "src/capability-bridge.ts",
     "html/index": "src/html/index.ts",
     "html/mount-html-block": "src/html/mount-html-block.ts",

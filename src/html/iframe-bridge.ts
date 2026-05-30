@@ -8,6 +8,11 @@ import type {
   MontageCapabilityEffect,
   MontageCapabilityInvokeRequest,
 } from "../types";
+import {
+  dispatchMontageAgentAction,
+  isMontageAgentActionRequest,
+  type MontageAgentActionRequest,
+} from "../agent-actions";
 
 export const IFRAME_BRIDGE_PROTOCOL = "montage-iframe-bridge/v1";
 
@@ -20,6 +25,13 @@ export interface InvokeMessage {
   effect: MontageCapabilityEffect;
   args?: unknown;
   context?: unknown;
+}
+
+export interface AgentActionMessage {
+  protocol: typeof IFRAME_BRIDGE_PROTOCOL;
+  kind: "agent-action";
+  callId: string;
+  request: MontageAgentActionRequest;
 }
 
 export interface ResultMessage {
@@ -38,6 +50,7 @@ export interface ParentIframeBridgeOptions<
   targetWindow: Window;
   targetOrigin?: string;
   context?: unknown;
+  agentActionTarget?: EventTarget;
   onCapabilityError?: (
     error: MontageError,
     context: MontageCapabilityBridgeErrorContext,
@@ -57,6 +70,15 @@ function isInvokeMessage(value: unknown): value is InvokeMessage {
     && typeof record.callId === "string"
     && typeof record.name === "string"
     && (record.effect === "pure" || record.effect === "query" || record.effect === "effect");
+}
+
+function isAgentActionMessage(value: unknown): value is AgentActionMessage {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  return record.protocol === IFRAME_BRIDGE_PROTOCOL
+    && record.kind === "agent-action"
+    && typeof record.callId === "string"
+    && isMontageAgentActionRequest(record.request);
 }
 
 function normalizeRequest(
@@ -88,6 +110,23 @@ export function createParentIframeBridge<
 
   async function handleMessage(event: MessageEvent): Promise<void> {
     if (event.source && event.source !== options.targetWindow) return;
+    if (isAgentActionMessage(event.data)) {
+      const target = options.agentActionTarget
+        ?? (typeof window !== "undefined" ? window : undefined);
+      if (!target) return;
+      const value = await dispatchMontageAgentAction(target, event.data.request);
+      const reply: ResultMessage = {
+        protocol: IFRAME_BRIDGE_PROTOCOL,
+        kind: "result",
+        callId: event.data.callId,
+        ok: value.type !== "error",
+        value,
+        ...(value.type === "error" ? { error: value.message } : {}),
+      };
+      options.targetWindow.postMessage(reply, targetOrigin);
+      return;
+    }
+
     if (!isInvokeMessage(event.data)) return;
 
     const request = normalizeRequest(event.data, options.context);
@@ -135,10 +174,10 @@ export function createParentIframeBridge<
 export function buildChildBridgeScript(): string {
   return `
 (function() {
-  if (window.MontageAOT && typeof window.MontageAOT.invoke === "function") return;
   var protocol = "${IFRAME_BRIDGE_PROTOCOL}";
   var pending = {};
   var nextId = 1;
+  var host = window.MontageAOT || {};
   window.addEventListener("message", function(event) {
     var data = event && event.data;
     if (!data || data.protocol !== protocol || data.kind !== "result") return;
@@ -151,8 +190,8 @@ export function buildChildBridgeScript(): string {
       callbacks.reject(new Error(data.error || "Capability invocation failed."));
     }
   });
-  window.MontageAOT = {
-    invoke: function(call) {
+  if (typeof host.invoke !== "function") {
+    host.invoke = function(call) {
       return new Promise(function(resolve, reject) {
         var callId = String(nextId++);
         pending[callId] = { resolve: resolve, reject: reject };
@@ -167,8 +206,25 @@ export function buildChildBridgeScript(): string {
           context: call && call.context
         }, "*");
       });
-    }
-  };
+    };
+  }
+  host.agent = host.agent || {};
+  if (typeof host.agent.invoke !== "function") {
+    host.agent.invoke = function(request) {
+      return new Promise(function(resolve, reject) {
+        var callId = String(nextId++);
+        pending[callId] = { resolve: resolve, reject: reject };
+        parent.postMessage({
+          protocol: protocol,
+          kind: "agent-action",
+          callId: callId,
+          request: request
+        }, "*");
+      });
+    };
+  }
+  window.MontageAOT = host;
+  window.MontageAOT.agent = host.agent;
 })();
 `.trim();
 }

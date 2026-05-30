@@ -301,6 +301,56 @@ describe("createMontageAdapter runtime contract", () => {
     } satisfies Partial<MontageError>);
   });
 
+  it("strips undeclared object args before invoking customer capability code", async () => {
+    const received: unknown[] = [];
+    const adapter = createMontageAdapter({
+      agent: companyAgent,
+      capabilities: [
+        {
+          name: "deal_stage_change",
+          effect: "effect",
+          description: "Move a deal through the pipeline.",
+          inputSchema: {
+            type: "object",
+            required: ["dealId", "stage"],
+            properties: {
+              dealId: { type: "string" },
+              stage: { type: "string" },
+              note: { type: "string" },
+            },
+          },
+        },
+      ],
+      invokeCapability(request) {
+        received.push(request.args);
+        return { ok: true };
+      },
+    });
+
+    await expect(
+      Promise.resolve().then(() => adapter.invokeCapability({
+        name: "deal_stage_change",
+        source: "deal_stage_change",
+        effect: "effect",
+        args: {
+          dealId: "deal-001",
+          stage: "Negotiation",
+          note: "Customer asked for review.",
+          alertThreshold: 250000,
+          secret: "do-not-forward",
+        } as never,
+      })),
+    ).resolves.toEqual({ ok: true });
+
+    expect(received).toEqual([
+      {
+        dealId: "deal-001",
+        stage: "Negotiation",
+        note: "Customer asked for review.",
+      },
+    ]);
+  });
+
   it("rejects capability output that fails its schema", async () => {
     const adapter = createMontageAdapter({
       agent: companyAgent,

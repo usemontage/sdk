@@ -36,6 +36,10 @@
       "types": "./dist/agent-adapter.d.ts",
       "import": "./dist/agent-adapter.js"
     },
+    "./agent-actions": {
+      "types": "./dist/agent-actions.d.ts",
+      "import": "./dist/agent-actions.js"
+    },
     "./capability-bridge": {
       "types": "./dist/capability-bridge.d.ts",
       "import": "./dist/capability-bridge.js"
@@ -69,6 +73,7 @@
     "prepack": "npm run build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --config /dev/null",
+    "proof:agents": "node examples/agents/run-all.mjs",
     "clean": "rm -rf dist .turbo"
   },
   "peerDependencies": {

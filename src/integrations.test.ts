@@ -1,73 +1,171 @@
 import { describe, expect, it, vi } from "vitest";
-import type { MontageToolkit } from "./tools";
-import { agno, cloudflareAgent, strands } from "./integrations";
+import {
+  langchainAgentAction,
+  mastraAgentAction,
+  copilotKitAgentAction,
+  openaiResponsesAgentAction,
+  rawAgentAction,
+  vercelAiAgentAction,
+} from "./integrations";
 
-function createToolkit(): MontageToolkit {
-  return {
-    adapters: {
-      configure: vi.fn(),
-      list: vi.fn(),
-      remove: vi.fn(),
-    },
-    execute: vi.fn(async (input) => ({
-      id: "gen_1",
-      html: "<html></html>",
-      creditsUsed: 1,
-      artifactId: input.artifactId,
-    })),
-    stream: vi.fn(),
-    executeStreaming: vi.fn(),
-    executeFragment: vi.fn(),
-    anthropic: vi.fn(),
-    openai: vi.fn(),
-  } as unknown as MontageToolkit;
+function createZodStub() {
+  const schema = {
+    optional: () => schema,
+    describe: () => schema,
+  };
+  const z = {
+    object: vi.fn(() => schema),
+    string: vi.fn(() => schema),
+    enum: vi.fn(() => schema),
+    record: vi.fn(() => schema),
+    unknown: vi.fn(() => schema),
+  };
+  return { z, schema };
 }
 
-describe("framework integrations", () => {
-  it("creates an Agno-compatible JSON schema tool", async () => {
-    const toolkit = createToolkit();
-    const tool = agno(toolkit);
+describe("agent action integration adapters", () => {
+  it("creates a Mastra-compatible agent-action tool", async () => {
+    const { z, schema } = createZodStub();
+    const handler = vi.fn(async (request) => ({
+      type: "text" as const,
+      content: `handled ${request.action}`,
+    }));
+    const tool = mastraAgentAction(handler, z);
 
-    expect(tool.name).toBe("montage_generate");
-    expect(tool.parameters.required).toContain("prompt");
-    await expect(tool.execute({ prompt: "Build a dashboard" })).resolves.toMatchObject({
-      id: "gen_1",
-      html: "<html></html>",
+    expect(tool.id).toBe("montage_agent_action");
+    expect(tool.inputSchema).toBe(schema);
+    await expect(
+      tool.execute({
+        action: "answer",
+        instruction: "Explain this anomaly.",
+      }),
+    ).resolves.toEqual({
+      type: "text",
+      content: "handled answer",
     });
-    expect(toolkit.execute).toHaveBeenCalledWith({
-      prompt: "Build a dashboard",
-      dataInfo: "",
-    });
-  });
-
-  it("creates a Cloudflare Agents tool", async () => {
-    const toolkit = createToolkit();
-    const tool = cloudflareAgent(toolkit);
-
-    expect(tool.name).toBe("montage_generate");
-    expect(tool.parameters.properties.dataInfo.type).toBe("string");
-    await tool.execute({
-      prompt: "Build a support queue",
-      dataInfo: "{\"tickets\":[]}",
-    });
-    expect(toolkit.execute).toHaveBeenCalledWith({
-      prompt: "Build a support queue",
-      dataInfo: "{\"tickets\":[]}",
+    expect(handler).toHaveBeenCalledWith({
+      action: "answer",
+      instruction: "Explain this anomaly.",
     });
   });
 
-  it("creates a Strands-compatible JSON schema tool", async () => {
-    const toolkit = createToolkit();
-    const tool = strands(toolkit);
+  it("serializes LangChain agent-action results as JSON strings", async () => {
+    const { z } = createZodStub();
+    const tool = langchainAgentAction(async () => ({
+      type: "artifact",
+      artifactId: "art_1",
+      revisionId: "rev_2",
+    }), z);
 
-    expect(tool.name).toBe("montage_generate");
-    expect(tool.description).toContain("production UI artifact");
-    await tool.execute({ prompt: "Build a field ops app", interactive: true });
-    expect(toolkit.execute).toHaveBeenCalledWith({
-      prompt: "Build a field ops app",
-      dataInfo: "",
-      interactive: true,
+    await expect(
+      tool.func({
+        action: "render_ui",
+        instruction: "Render a follow-up chart.",
+      }),
+    ).resolves.toBe(JSON.stringify({
+      type: "artifact",
+      artifactId: "art_1",
+      revisionId: "rev_2",
+    }));
+  });
+
+  it("returns structured errors for invalid raw agent-action input", async () => {
+    const handler = vi.fn();
+    const tool = rawAgentAction(handler);
+
+    await expect(tool.execute({ action: "answer" })).resolves.toEqual({
+      type: "error",
+      code: "INVALID_AGENT_ACTION",
+      message: "Montage agent action request is invalid.",
+    });
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it("wraps handler exceptions as agent-action error results", async () => {
+    const { z } = createZodStub();
+    const tool = vercelAiAgentAction(async () => {
+      throw new Error("agent backend unavailable");
+    }, z);
+
+    await expect(
+      tool.execute({
+        action: "run_workflow",
+        instruction: "Refresh this artifact from source data.",
+      }),
+    ).resolves.toEqual({
+      type: "error",
+      message: "agent backend unavailable",
+    });
+  });
+
+  it("creates an OpenAI Responses-compatible agent-action adapter", async () => {
+    const handler = vi.fn(async (request) => ({
+      type: "html" as const,
+      html: `<main>${request.instruction}</main>`,
+    }));
+    const adapter = openaiResponsesAgentAction(handler);
+
+    expect(adapter.tool).toMatchObject({
+      type: "function",
+      name: "montage_agent_action",
+      parameters: {
+        required: ["action", "instruction"],
+      },
+    });
+
+    const result = await adapter.execute({
+      type: "function_call",
+      call_id: "call_123",
+      name: "montage_agent_action",
+      arguments: JSON.stringify({
+        action: "render_ui",
+        instruction: "Render renewal-risk UI.",
+      }),
+    });
+
+    expect(result).toEqual({
+      type: "html",
+      html: "<main>Render renewal-risk UI.</main>",
+    });
+    expect(handler).toHaveBeenCalledWith({
+      action: "render_ui",
+      instruction: "Render renewal-risk UI.",
+    });
+    expect(adapter.toOutputItem("call_123", result)).toEqual({
+      type: "function_call_output",
+      call_id: "call_123",
+      output: JSON.stringify(result),
+    });
+  });
+
+  it("creates a CopilotKit useFrontendTool-compatible agent-action config", async () => {
+    const { z, schema } = createZodStub();
+    const handler = vi.fn(async () => ({
+      type: "patch" as const,
+      artifactId: "art_1",
+      revisionId: "rev_2",
+      summary: "Patched by CopilotKit host",
+    }));
+    const tool = copilotKitAgentAction(handler, z);
+
+    expect(tool.name).toBe("montage_agent_action");
+    expect(tool.parameters).toBe(schema);
+    await expect(
+      tool.handler({
+        artifactId: "art_1",
+        action: "patch_artifact",
+        instruction: "Patch this artifact.",
+      }),
+    ).resolves.toEqual({
+      type: "patch",
+      artifactId: "art_1",
+      revisionId: "rev_2",
+      summary: "Patched by CopilotKit host",
+    });
+    expect(handler).toHaveBeenCalledWith({
+      artifactId: "art_1",
+      action: "patch_artifact",
+      instruction: "Patch this artifact.",
     });
   });
 });
-

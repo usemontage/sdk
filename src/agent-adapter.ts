@@ -164,9 +164,56 @@ function validateJsonSchema(
 
 function capabilitySchemaValue(
   schema: Record<string, unknown>,
-  args: readonly unknown[],
+  args: unknown,
 ): unknown {
-  return schema.type === "array" ? args : args.length === 1 ? args[0] : args;
+  if (schema.type === "array") return args;
+  return Array.isArray(args) ? args.length === 1 ? args[0] : args : args;
+}
+
+function sanitizeValueForSchema(
+  schema: unknown,
+  value: unknown,
+): unknown {
+  if (!isRecord(schema)) return value;
+
+  if ((schema.type === "array" || schema.items) && Array.isArray(value)) {
+    return schema.items
+      ? value.map((entry) => sanitizeValueForSchema(schema.items, entry))
+      : value;
+  }
+
+  const properties = isRecord(schema.properties) ? schema.properties : null;
+  if ((schema.type === "object" || properties) && isRecord(value)) {
+    if (!properties) return value;
+    const sanitized: Record<string, unknown> = {};
+    for (const [key, childSchema] of Object.entries(properties)) {
+      if (key in value) sanitized[key] = sanitizeValueForSchema(childSchema, value[key]);
+    }
+    if (schema.additionalProperties === true) {
+      for (const [key, entry] of Object.entries(value)) {
+        if (!(key in sanitized)) sanitized[key] = entry;
+      }
+    }
+    return sanitized;
+  }
+
+  return value;
+}
+
+function sanitizeCapabilityArgs(
+  capability: MontageCapabilitySpec,
+  args: unknown,
+): unknown {
+  const schema = capability.inputSchema;
+  if (!schema) return args;
+  const schemaValue = sanitizeValueForSchema(
+    schema,
+    capabilitySchemaValue(schema, args),
+  );
+  if (schema.type !== "array" && Array.isArray(args) && args.length === 1) {
+    return [schemaValue];
+  }
+  return schemaValue;
 }
 
 function assertCapabilitySchema(
@@ -326,7 +373,7 @@ export function createMontageAdapter<TAgent extends MontageAgentDescriptor>(
       }
 
       const source = request.source ?? capability.source ?? capability.name;
-      const args = request.args ?? [];
+      const args = sanitizeCapabilityArgs(capability, request.args ?? []);
       assertCapabilitySchema(
         "input",
         capability,

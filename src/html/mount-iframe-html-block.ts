@@ -13,6 +13,7 @@ import type {
 } from "../agent-adapter";
 import type { MontageCapabilityBridgeErrorContext } from "../capability-bridge";
 import type { MontageError } from "../errors";
+import { createIframeAutoResizer } from "./iframe-autoresize";
 import {
   buildChildBridgeScript,
   createParentIframeBridge,
@@ -82,18 +83,13 @@ export function mountIframeHtmlBlock<
     : rawHtml;
   iframe.srcdoc = html;
 
-  let resizeObserver: ResizeObserver | undefined;
-  let mutationObserver: MutationObserver | undefined;
+  let cleanupResizer: (() => void) | undefined;
   let parentBridge: ParentIframeBridge | undefined;
 
   const cleanupObservers = () => {
-    if (resizeObserver) {
-      resizeObserver.disconnect();
-      resizeObserver = undefined;
-    }
-    if (mutationObserver) {
-      mutationObserver.disconnect();
-      mutationObserver = undefined;
+    if (cleanupResizer) {
+      cleanupResizer();
+      cleanupResizer = undefined;
     }
   };
 
@@ -110,40 +106,14 @@ export function mountIframeHtmlBlock<
       }
       if (!autoResize) return;
 
-      const measure = () => {
-        let contentHeight = Math.max(
-          doc.documentElement?.scrollHeight ?? 0,
-          doc.body?.scrollHeight ?? 0,
-          minHeight,
-        );
-        if (contentHeight <= minHeight && doc.body) {
-          const bodyStyle = doc.defaultView?.getComputedStyle(doc.body);
-          const explicitMinH = parseInt(bodyStyle?.minHeight ?? "0", 10);
-          if (explicitMinH > contentHeight) contentHeight = explicitMinH;
-        }
-        iframe.style.height = `${contentHeight}px`;
-        if (onResize) onResize(contentHeight);
-      };
-      measure();
-
-      if (typeof ResizeObserver !== "undefined") {
-        resizeObserver = new ResizeObserver(measure);
-        if (doc.documentElement) resizeObserver.observe(doc.documentElement);
-        if (doc.body) resizeObserver.observe(doc.body);
-      }
-
-      // Catch dynamic DOM changes from inline scripts (telemetry beacons,
-      // chart hydration, etc.) that the ResizeObserver may miss on attribute
-      // changes that don't trigger a layout shift on its observed roots.
-      if (typeof MutationObserver !== "undefined" && doc.body) {
-        mutationObserver = new MutationObserver(() => measure());
-        mutationObserver.observe(doc.body, {
-          childList: true,
-          subtree: true,
-          attributes: false,
-          characterData: false,
-        });
-      }
+      // Re-attach is possible if the iframe reloads; tear the previous one down.
+      cleanupObservers();
+      cleanupResizer = createIframeAutoResizer({
+        iframe,
+        doc,
+        minHeight,
+        ...(onResize ? { onResize } : {}),
+      });
     } catch {
       // Cross-origin or torn-down document — observers can't attach.
     }
@@ -155,6 +125,7 @@ export function mountIframeHtmlBlock<
       adapter: input.adapter,
       targetWindow: iframe.contentWindow,
       context: input.context,
+      agentActionTarget: host,
       onCapabilityError: input.onCapabilityError,
       targetOrigin: input.targetOrigin,
     });

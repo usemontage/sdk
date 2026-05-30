@@ -4,6 +4,7 @@ import {
   installCapabilityBridge,
   uninstallCapabilityBridge,
 } from "./capability-bridge-runtime";
+import { installMontageAgentActionHandler } from "./agent-actions";
 
 type TestGlobal = typeof globalThis & {
   MontageAOT?: {
@@ -14,6 +15,13 @@ type TestGlobal = typeof globalThis & {
       args?: unknown;
       context?: unknown;
     }): unknown;
+    agent?: {
+      invoke(request: {
+        action: string;
+        instruction: string;
+        artifactId?: string;
+      }): Promise<unknown>;
+    };
   };
 };
 
@@ -79,6 +87,125 @@ describe("capability-bridge-runtime — SDK mode", () => {
       context: { tenantId: "t1" },
     });
     expect(result).toEqual({ rows: [{ id: 1 }] });
+  });
+
+  it("uses the adapter capability effect when generated markup sends the wrong effect", async () => {
+    const invokeCapability = vi.fn(async (request) => ({
+      ok: true,
+      effect: request.effect,
+    }));
+    const adapter = createMontageAdapter({
+      agent: { id: "a", name: "Agent A" },
+      capabilities: [
+        {
+          name: "file_add",
+          effect: "query",
+          description: "Attach a note.",
+          availability: "adapter",
+        },
+      ],
+      invokeCapability,
+    });
+
+    installCapabilityBridge({ mode: "sdk", adapter });
+
+    const result = await (globalThis as TestGlobal).MontageAOT?.invoke({
+      name: "file_add",
+      effect: "effect",
+      args: { note: "Pricing owner follow-up." },
+    });
+
+    expect(result).toEqual({ ok: true, effect: "query" });
+    expect(invokeCapability).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "file_add",
+        effect: "query",
+        args: { note: "Pricing owner follow-up." },
+      }),
+    );
+  });
+
+  it("emits capability lifecycle events with requests and responses", async () => {
+    const onCapabilityEvent = vi.fn();
+    const invokeCapability = vi.fn(async (request) => ({
+      ok: true,
+      receivedArgs: request.args,
+    }));
+    const adapter = createMontageAdapter({
+      agent: { id: "a", name: "Agent A" },
+      capabilities: [
+        {
+          name: "fetchUsers",
+          effect: "query",
+          description: "Fetch users.",
+          availability: "adapter",
+        },
+      ],
+      invokeCapability,
+    });
+
+    installCapabilityBridge({
+      mode: "sdk",
+      adapter,
+      onCapabilityEvent,
+    });
+
+    const aot = (globalThis as TestGlobal).MontageAOT;
+    const result = await aot?.invoke({
+      name: "fetchUsers",
+      effect: "query",
+      args: { limit: 10 },
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      receivedArgs: { limit: 10 },
+    });
+    expect(onCapabilityEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        phase: "start",
+        request: expect.objectContaining({
+          name: "fetchUsers",
+          args: { limit: 10 },
+        }),
+      }),
+    );
+    expect(onCapabilityEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        phase: "success",
+        request: expect.objectContaining({ name: "fetchUsers" }),
+        result: { ok: true, receivedArgs: { limit: 10 } },
+      }),
+    );
+  });
+
+  it("exposes MontageAOT.agent.invoke through the shared agent action event contract", async () => {
+    const agentTarget = new EventTarget();
+    const uninstallAgent = installMontageAgentActionHandler(agentTarget, async (request) => ({
+      type: "artifact",
+      artifactId: request.artifactId ?? "art_1",
+      revisionId: "rev_2",
+      html: "<main>Updated</main>",
+    }));
+    const adapter = createMontageAdapter({
+      agent: { id: "a", name: "Agent A" },
+    });
+
+    installCapabilityBridge({ mode: "sdk", adapter, agentActionTarget: agentTarget });
+
+    const result = await (globalThis as TestGlobal).MontageAOT?.agent?.invoke({
+      artifactId: "art_1",
+      action: "patch_artifact",
+      instruction: "Add a risk panel.",
+    });
+
+    uninstallAgent();
+    expect(result).toEqual({
+      type: "artifact",
+      artifactId: "art_1",
+      revisionId: "rev_2",
+      html: "<main>Updated</main>",
+    });
   });
 
   it("invoke calls onCapabilityError when adapter throws", async () => {
@@ -177,6 +304,34 @@ describe("capability-bridge-runtime — hosted mode", () => {
         body: expect.stringContaining("endUser_42"),
       }),
     );
+  });
+
+  it("hosted mode exposes MontageAOT.agent.invoke without requiring capability bindings", async () => {
+    const agentTarget = new EventTarget();
+    const uninstallAgent = installMontageAgentActionHandler(agentTarget, async (request) => ({
+      type: "text",
+      content: `handled:${request.action}`,
+    }));
+    installCapabilityBridge({
+      mode: "hosted",
+      bindingManifest: { bindings: {}, corsOrigins: [], updatedAt: "" },
+      artifactId: "a1",
+      proxyBaseUrl: "https://montage.app",
+      runtimeContext: { subject: "endUser_42" },
+      agentActionTarget: agentTarget,
+    });
+
+    const result = await (globalThis as TestGlobal).MontageAOT?.agent?.invoke({
+      action: "answer",
+      instruction: "Explain this chart.",
+      artifactId: "a1",
+    });
+
+    uninstallAgent();
+    expect(result).toEqual({
+      type: "text",
+      content: "handled:answer",
+    });
   });
 
   it("hosted mode resolves proxy binding through Montage proxy", async () => {

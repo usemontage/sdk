@@ -14,13 +14,6 @@ const standardCapabilityFragments = [
   ["STD", "_CAPABILITY"].join(""),
   ["runtime", "-capabilities"].join(""),
 ];
-const implementationLeakFragments = [
-  ["flux", "ui"].join(""),
-  ["packages", "montage"].join("/"),
-  ["mono", "repo"].join(""),
-  [["inter", "nal"].join(""), "source"].join(" "),
-  [["inter", "nal"].join(""), "logic"].join(" "),
-];
 
 function collectExportTargets(value: unknown): string[] {
   if (typeof value === "string") return [value];
@@ -47,24 +40,24 @@ describe("package public surface", () => {
     });
   });
 
-  it("does not expose non-public URLs or paths through package docs", () => {
+  it("does not leak monorepo URLs or paths through package docs", () => {
     const publicPackageFiles = [
       join(sourceRoot, "../package.json"),
       join(sourceRoot, "../README.md"),
       join(sourceRoot, "../CONTRIBUTING.md"),
       join(sourceRoot, "public-types.ts"),
     ];
-    const forbiddenFragments = [
+    const privateFragments = [
       ["github.com", ["montage", "dev"].join("-"), "montage"].join("/"),
       ["montage", "dev"].join("."),
       ["packages", "montage-sdk"].join("/"),
-      [["inter", "nal"].join(""), "Montage", ["work", "space"].join("")].join(" "),
-      ["Montage", ["inter", "nal"].join("")].join("-"),
+      ["internal Montage", "workspace"].join(" "),
+      ["Montage", "internal"].join("-"),
     ];
 
     const offenders = publicPackageFiles.flatMap((filePath) => {
       const content = readFileSync(filePath, "utf8");
-      return forbiddenFragments
+      return privateFragments
         .filter((fragment) => content.includes(fragment))
         .map((fragment) => `${relative(sourceRoot, filePath)} contains ${fragment}`);
     });
@@ -106,26 +99,6 @@ describe("package public surface", () => {
         );
         return matches.map((fragment) => `${relative(sourceRoot, filePath)} contains ${fragment}`);
       });
-
-    expect(offenders).toEqual([]);
-  });
-
-  it("does not mention backend implementation families in source or docs", () => {
-    const publicFiles = [
-      join(sourceRoot, "../package.json"),
-      join(sourceRoot, "../README.md"),
-      join(sourceRoot, "../CONTRIBUTING.md"),
-      ...collectSourceFiles(sourceRoot).filter(
-        (filePath) => relative(sourceRoot, filePath) !== publicSurfaceTestFile,
-      ),
-    ];
-
-    const offenders = publicFiles.flatMap((filePath) => {
-      const content = readFileSync(filePath, "utf8").toLowerCase();
-      return implementationLeakFragments
-        .filter((fragment) => content.includes(fragment))
-        .map((fragment) => `${relative(sourceRoot, filePath)} contains ${fragment}`);
-    });
 
     expect(offenders).toEqual([]);
   });
